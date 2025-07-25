@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { Layout, Menu, Button, Avatar, Dropdown, Space, Typography } from 'antd'
-import { UserOutlined, LogoutOutlined, SettingOutlined, TeamOutlined } from '@ant-design/icons'
+import { UserOutlined, LogoutOutlined, SettingOutlined, TeamOutlined, HomeOutlined } from '@ant-design/icons'
 import LoginForm from '@/components/auth/LoginForm'
 import UserManagement from '@/components/auth/UserManagement'
+import HouseManagement from '@/components/houses/HouseManagement'
 import { getRoleDisplayName } from '@/lib/permissions'
 
 const { Header, Sider, Content } = Layout
@@ -76,6 +77,11 @@ export default function Home() {
       label: '仪表板',
     },
     {
+      key: 'houses',
+      icon: <HomeOutlined />,
+      label: '农房管理',
+    },
+    {
       key: 'users',
       icon: <TeamOutlined />,
       label: '用户管理',
@@ -89,6 +95,8 @@ export default function Home() {
   // 渲染内容区域
   const renderContent = () => {
     switch (selectedMenu) {
+      case 'houses':
+        return <HouseManagement />
       case 'users':
         return <UserManagement token={token} currentUser={currentUser} />
       case 'dashboard':

@@ -8,12 +8,25 @@
 │   └── specs/               # Project specifications
 ├── src/                     # Source code (all application code goes here)
 │   ├── app/                 # Next.js App Router pages and layouts
+│   │   ├── api/             # API routes for backend functionality
+│   │   │   ├── auth/        # Authentication endpoints
+│   │   │   ├── houses/      # 农房管理 API endpoints
+│   │   │   ├── craftsmen/   # 工匠管理 API endpoints
+│   │   │   └── users/       # 用户管理 API endpoints
 │   │   ├── globals.css      # Global styles and Tailwind imports
 │   │   ├── layout.tsx       # Root layout with providers
 │   │   └── page.tsx         # Home page component
 │   ├── components/          # React components
+│   │   ├── auth/            # Authentication components
+│   │   ├── houses/          # 农房管理相关组件
+│   │   ├── craftsmen/       # 工匠管理相关组件
+│   │   ├── maps/            # 地图相关组件
 │   │   └── ui/              # shadcn/ui components (auto-generated)
 │   └── lib/                 # Utility functions and shared logic
+│       ├── auth.ts          # Authentication utilities
+│       ├── db-utils.ts      # Database utilities
+│       ├── permissions.ts   # Permission management
+│       ├── prisma.ts        # Prisma client configuration
 │       └── utils.ts         # Common utilities (cn function, etc.)
 ├── public/                  # Static assets (images, icons, etc.)
 └── [config files]          # Root-level configuration files
