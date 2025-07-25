@@ -1,0 +1,432 @@
+// 青岛市农房建设管理和乡村建设工匠培训信息平台数据库模型
+// Qingdao Rural Housing Construction Management and Craftsman Training Platform Database Schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表 - 系统用户管理
+model User {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username    String   @unique @db.VarChar(50)
+  password    String   @db.VarChar(255)
+  realName    String   @map("real_name") @db.VarChar(100)
+  phone       String?  @db.VarChar(20)
+  email       String?  @db.VarChar(100)
+  role        UserRole
+  regionCode  String   @map("region_code") @db.VarChar(20)
+  regionName  String   @map("region_name") @db.VarChar(100)
+  status      UserStatus @default(ACTIVE)
+  lastLoginAt DateTime? @map("last_login_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  appliedHouses     House[]           @relation("HouseApplicant")
+  inspections       Inspection[]      @relation("Inspector")
+  creditEvaluations CreditEvaluation[] @relation("Evaluator")
+  
+  @@index([regionCode])
+  @@index([role])
+  @@map("users")
+}
+
+// 农房信息表 - 核心农房数据管理
+model House {
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  address            String            @db.VarChar(500)
+  buildingTime       DateTime?         @map("building_time") @db.Date
+  floors             Int?
+  height             Decimal?          @db.Decimal(5,2)
+  houseType          HouseType?        @map("house_type")
+  constructionStatus ConstructionStatus @default(PLANNED) @map("construction_status")
+  applicantId        String            @map("applicant_id") @db.Uuid
+  regionCode         String            @map("region_code") @db.VarChar(20)
+  regionName         String            @map("region_name") @db.VarChar(100)
+  coordinates        String?           // 存储为 "lat,lng" 格式
+  landArea           Decimal?          @map("land_area") @db.Decimal(10,2)
+  buildingArea       Decimal?          @map("building_area") @db.Decimal(10,2)
+  propertyType       PropertyType?     @map("property_type")
+  approvalNumber     String?           @map("approval_number") @db.VarChar(100)
+  completionDate     DateTime?         @map("completion_date") @db.Date
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  // 关联关系
+  applicant           User                @relation("HouseApplicant", fields: [applicantId], references: [id])
+  constructionProjects ConstructionProject[]
+  inspections         Inspection[]
+  housePhotos         HousePhoto[]
+  
+  @@index([regionCode])
+  @@index([constructionStatus])
+  @@index([houseType])
+  @@map("houses")
+}
+
+// 工匠信息表 - 乡村建设工匠管理
+model Craftsman {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String           @db.VarChar(100)
+  idNumber          String           @unique @map("id_number") @db.VarChar(18)
+  phone             String           @db.VarChar(20)
+  specialties       String[]         // 专业技能数组
+  skillLevel        SkillLevel       @default(BEGINNER) @map("skill_level")
+  creditScore       Int              @default(100) @map("credit_score")
+  certificationLevel CertificationLevel? @map("certification_level")
+  teamId            String?          @map("team_id") @db.Uuid
+  regionCode        String           @map("region_code") @db.VarChar(20)
+  regionName        String           @map("region_name") @db.VarChar(100)
+  status            CraftsmanStatus  @default(ACTIVE)
+  address           String?          @db.VarChar(500)
+  emergencyContact  String?          @map("emergency_contact") @db.VarChar(100)
+  emergencyPhone    String?          @map("emergency_phone") @db.VarChar(20)
+  joinDate          DateTime         @default(now()) @map("join_date") @db.Date
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  // 关联关系
+  team                 Team?                @relation(fields: [teamId], references: [id])
+  trainingRecords      TrainingRecord[]
+  creditEvaluations    CreditEvaluation[]
+  constructionProjects ConstructionProject[]
+  
+  @@index([regionCode])
+  @@index([skillLevel])
+  @@index([creditScore])
+  @@index([status])
+  @@map("craftsmen")
+}
+
+// 工匠队伍表 - 施工班组、合作社管理
+model Team {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String     @db.VarChar(200)
+  teamType    TeamType   @map("team_type")
+  leaderId    String?    @map("leader_id") @db.Uuid
+  regionCode  String     @map("region_code") @db.VarChar(20)
+  regionName  String     @map("region_name") @db.VarChar(100)
+  description String?    @db.Text
+  status      TeamStatus @default(ACTIVE)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  // 关联关系
+  craftsmen Craftsman[]
+  
+  @@index([regionCode])
+  @@index([teamType])
+  @@map("teams")
+}
+
+// 培训记录表 - 工匠培训管理
+model TrainingRecord {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  craftsmanId      String           @map("craftsman_id") @db.Uuid
+  trainingType     String           @map("training_type") @db.VarChar(100)
+  trainingContent  String           @map("training_content") @db.Text
+  durationHours    Int              @map("duration_hours")
+  trainingDate     DateTime         @map("training_date") @db.Date
+  completionStatus CompletionStatus @default(IN_PROGRESS) @map("completion_status")
+  certificateUrl   String?          @map("certificate_url") @db.VarChar(500)
+  instructor       String           @db.VarChar(100)
+  trainingLocation String?          @map("training_location") @db.VarChar(200)
+  score            Int?             // 培训成绩
+  remarks          String?          @db.Text
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  // 关联关系
+  craftsman Craftsman @relation(fields: [craftsmanId], references: [id], onDelete: Cascade)
+  
+  @@index([craftsmanId])
+  @@index([trainingDate])
+  @@index([completionStatus])
+  @@map("training_records")
+}
+
+// 信用评价表 - 工匠信用管理
+model CreditEvaluation {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  craftsmanId    String   @map("craftsman_id") @db.Uuid
+  evaluationType String   @map("evaluation_type") @db.VarChar(50)
+  pointsChange   Int      @map("points_change")
+  reason         String   @db.Text
+  evidenceUrls   String[] @map("evidence_urls")
+  evaluatorId    String   @map("evaluator_id") @db.Uuid
+  evaluationDate DateTime @map("evaluation_date") @db.Date
+  status         EvaluationStatus @default(ACTIVE)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  craftsman Craftsman @relation(fields: [craftsmanId], references: [id], onDelete: Cascade)
+  evaluator User      @relation("Evaluator", fields: [evaluatorId], references: [id])
+  
+  @@index([craftsmanId])
+  @@index([evaluationDate])
+  @@index([evaluationType])
+  @@map("credit_evaluations")
+}
+
+// 建设项目表 - 农房建设项目管理
+model ConstructionProject {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  houseId         String        @map("house_id") @db.Uuid
+  craftsmanId     String        @map("craftsman_id") @db.Uuid
+  projectName     String        @map("project_name") @db.VarChar(200)
+  projectType     ProjectType   @map("project_type")
+  startDate       DateTime?     @map("start_date") @db.Date
+  endDate         DateTime?     @map("end_date") @db.Date
+  estimatedCost   Decimal?      @map("estimated_cost") @db.Decimal(12,2)
+  actualCost      Decimal?      @map("actual_cost") @db.Decimal(12,2)
+  projectStatus   ProjectStatus @default(PLANNED) @map("project_status")
+  description     String?       @db.Text
+  contractNumber  String?       @map("contract_number") @db.VarChar(100)
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  // 关联关系
+  house     House     @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  craftsman Craftsman @relation(fields: [craftsmanId], references: [id])
+  
+  @@index([houseId])
+  @@index([craftsmanId])
+  @@index([projectStatus])
+  @@map("construction_projects")
+}
+
+// 检查记录表 - 质量安全监管
+model Inspection {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  houseId        String         @map("house_id") @db.Uuid
+  inspectorId    String         @map("inspector_id") @db.Uuid
+  inspectionType InspectionType @map("inspection_type")
+  inspectionDate DateTime       @map("inspection_date") @db.Date
+  result         InspectionResult
+  score          Int?           // 检查评分
+  issues         String?        @db.Text // 发现的问题
+  suggestions    String?        @db.Text // 整改建议
+  photos         String[]       // 检查照片URLs
+  followUpDate   DateTime?      @map("follow_up_date") @db.Date
+  status         InspectionStatus @default(PENDING)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  // 关联关系
+  house     House @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  inspector User  @relation("Inspector", fields: [inspectorId], references: [id])
+  
+  @@index([houseId])
+  @@index([inspectionDate])
+  @@index([inspectionType])
+  @@map("inspections")
+}
+
+// 农房照片表 - 建设过程照片管理
+model HousePhoto {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  houseId     String    @map("house_id") @db.Uuid
+  photoUrl    String    @map("photo_url") @db.VarChar(500)
+  photoType   PhotoType @map("photo_type")
+  description String?   @db.VarChar(200)
+  takenAt     DateTime  @map("taken_at")
+  uploadedBy  String?   @map("uploaded_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // 关联关系
+  house House @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  
+  @@index([houseId])
+  @@index([photoType])
+  @@map("house_photos")
+}
+
+// 满意度调查表 - 群众满意度管理
+model SatisfactionSurvey {
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  houseId      String           @map("house_id") @db.Uuid
+  surveyType   SurveyType       @map("survey_type")
+  overallScore Int              @map("overall_score") // 总体满意度评分 1-5
+  qualityScore Int?             @map("quality_score") // 质量满意度
+  serviceScore Int?             @map("service_score") // 服务满意度
+  timeScore    Int?             @map("time_score") // 时效满意度
+  feedback     String?          @db.Text // 意见反馈
+  respondent   String           @db.VarChar(100) // 受访者姓名
+  phone        String?          @db.VarChar(20) // 联系电话
+  surveyDate   DateTime         @map("survey_date") @db.Date
+  status       SurveyStatus     @default(COMPLETED)
+  createdAt    DateTime         @default(now()) @map("created_at")
+  
+  @@index([surveyDate])
+  @@index([surveyType])
+  @@map("satisfaction_surveys")
+}
+
+// 系统日志表 - 操作审计
+model SystemLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  action    String   @db.VarChar(100)
+  module    String   @db.VarChar(50)
+  details   Json?    // 操作详情
+  ipAddress String?  @map("ip_address") @db.VarChar(45)
+  userAgent String?  @map("user_agent") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("system_logs")
+}
+
+// 枚举定义
+enum UserRole {
+  SUPER_ADMIN    // 超级管理员
+  CITY_ADMIN     // 市级管理员
+  DISTRICT_ADMIN // 区市管理员
+  TOWN_ADMIN     // 镇街管理员
+  VILLAGE_ADMIN  // 村级管理员
+  CRAFTSMAN      // 工匠
+  FARMER         // 农户
+  INSPECTOR      // 检查员
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum HouseType {
+  NEW_BUILD    // 新建
+  RENOVATION   // 改建
+  EXPANSION    // 扩建
+  REPAIR       // 维修
+}
+
+enum ConstructionStatus {
+  PLANNED      // 规划中
+  APPROVED     // 已审批
+  IN_PROGRESS  // 建设中
+  COMPLETED    // 已完工
+  SUSPENDED    // 暂停
+  CANCELLED    // 取消
+}
+
+enum PropertyType {
+  RESIDENTIAL  // 住宅
+  COMMERCIAL   // 商业
+  MIXED        // 混合
+}
+
+enum SkillLevel {
+  BEGINNER     // 初级
+  INTERMEDIATE // 中级
+  ADVANCED     // 高级
+  EXPERT       // 专家级
+}
+
+enum CertificationLevel {
+  LEVEL_1      // 一级
+  LEVEL_2      // 二级
+  LEVEL_3      // 三级
+  LEVEL_4      // 四级
+  LEVEL_5      // 五级
+}
+
+enum CraftsmanStatus {
+  ACTIVE       // 活跃
+  INACTIVE     // 不活跃
+  SUSPENDED    // 暂停
+  RETIRED      // 退休
+}
+
+enum TeamType {
+  CONSTRUCTION_TEAM  // 施工班组
+  COOPERATIVE        // 合作社
+  PARTNERSHIP        // 合伙制企业
+}
+
+enum TeamStatus {
+  ACTIVE
+  INACTIVE
+  DISSOLVED
+}
+
+enum CompletionStatus {
+  IN_PROGRESS  // 进行中
+  COMPLETED    // 已完成
+  FAILED       // 未通过
+  CANCELLED    // 已取消
+}
+
+enum EvaluationStatus {
+  ACTIVE       // 有效
+  REVOKED      // 已撤销
+}
+
+enum ProjectType {
+  NEW_CONSTRUCTION // 新建工程
+  RENOVATION       // 改造工程
+  REPAIR           // 维修工程
+  EXPANSION        // 扩建工程
+}
+
+enum ProjectStatus {
+  PLANNED      // 计划中
+  IN_PROGRESS  // 进行中
+  COMPLETED    // 已完成
+  SUSPENDED    // 暂停
+  CANCELLED    // 已取消
+}
+
+enum InspectionType {
+  SURVEY       // 勘察到场
+  DESIGN       // 设计到场
+  CONSTRUCTION // 施工到场
+  SUPERVISION  // 监理到场
+  BUILDING     // 建设到场
+  QUALITY      // 质监到场
+  SAFETY       // 安全检查
+  PROGRESS     // 进度检查
+}
+
+enum InspectionResult {
+  PASS         // 通过
+  FAIL         // 不通过
+  CONDITIONAL  // 有条件通过
+}
+
+enum InspectionStatus {
+  PENDING      // 待检查
+  COMPLETED    // 已完成
+  RESCHEDULED  // 已重新安排
+}
+
+enum PhotoType {
+  BEFORE       // 施工前
+  DURING       // 施工中
+  AFTER        // 施工后
+  INSPECTION   // 检查照片
+  PROBLEM      // 问题照片
+}
+
+enum SurveyType {
+  NEW_BUILD_SATISFACTION    // 新建农房满意度
+  RENOVATION_SATISFACTION   // 改建农房满意度
+  EXPANSION_SATISFACTION    // 扩建农房满意度
+  REPAIR_SATISFACTION       // 危房改造满意度
+}
+
+enum SurveyStatus {
+  PENDING      // 待调查
+  COMPLETED    // 已完成
+  CANCELLED    // 已取消
+}
