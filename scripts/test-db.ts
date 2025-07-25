@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { testConnection, statisticsOperations } from '../src/lib/db-utils'
+import { userService } from '../src/lib/db-utils'
 import { prisma } from '../src/lib/prisma'
 
 async function testDatabase() {
@@ -8,11 +8,7 @@ async function testDatabase() {
   
   try {
     // 测试基本连接
-    const isConnected = await testConnection()
-    if (!isConnected) {
-      console.error('❌ 数据库连接失败')
-      process.exit(1)
-    }
+    await prisma.$connect()
     console.log('✅ 数据库连接成功')
 
     // 测试表是否存在
