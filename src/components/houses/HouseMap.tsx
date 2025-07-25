@@ -17,22 +17,22 @@ const { Option } = Select
 // 地图配置
 const MAP_CONFIG = {
   center: [120.3826, 36.0671], // 青岛市中心坐标 [lng, lat]
-  zoom: 10,
+  zoom: 8, // 降低缩放级别以显示更大范围
   mapStyle: 'amap://styles/normal',
 }
 
 // 青岛市区域配置
 const QINGDAO_DISTRICTS = [
-  { code: '370202', name: '市南区', center: [120.3826, 36.0671] },
-  { code: '370203', name: '市北区', center: [120.3826, 36.0671] },
-  { code: '370211', name: '黄岛区', center: [120.1951, 35.9618] },
-  { code: '370212', name: '崂山区', center: [120.4651, 36.1073] },
-  { code: '370213', name: '李沧区', center: [120.4336, 36.1450] },
-  { code: '370214', name: '城阳区', center: [120.3963, 36.3073] },
-  { code: '370281', name: '胶州市', center: [120.0335, 36.2646] },
-  { code: '370282', name: '即墨区', center: [120.4473, 36.3889] },
-  { code: '370283', name: '平度市', center: [119.9597, 36.7868] },
-  { code: '370285', name: '莱西市', center: [120.5177, 36.8887] },
+  { code: '370202', name: '市南区', center: [120.3826, 36.0671] }, // 市南区政府附近
+  { code: '370203', name: '市北区', center: [120.3740, 36.0870] }, // 市北区政府附近
+  { code: '370211', name: '黄岛区', center: [120.1951, 35.9618] }, // 黄岛区政府附近
+  { code: '370212', name: '崂山区', center: [120.4651, 36.1073] }, // 崂山区政府附近
+  { code: '370213', name: '李沧区', center: [120.4336, 36.1450] }, // 李沧区政府附近
+  { code: '370214', name: '城阳区', center: [120.3963, 36.3073] }, // 城阳区政府附近
+  { code: '370281', name: '胶州市', center: [120.0335, 36.2646] }, // 胶州市政府附近
+  { code: '370282', name: '即墨区', center: [120.4473, 36.3889] }, // 即墨区政府附近
+  { code: '370283', name: '平度市', center: [119.9597, 36.7868] }, // 平度市政府附近
+  { code: '370285', name: '莱西市', center: [120.5177, 36.8887] }, // 莱西市政府附近
 ]
 
 // 农房数据接口
@@ -97,13 +97,15 @@ export default function HouseMap({
   const [filters, setFilters] = useState<MapFilters>({})
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [mapLoaded, setMapLoaded] = useState(false)
+  // 新增：用于存储区边界 Polygon 实例
+  const districtPolygonsRef = useRef<any[]>([])
 
   // 初始化高德地图
   const initMap = () => {
     if (!mapRef.current || mapInstanceRef.current) return
 
     // 检查高德地图API是否已加载
-    if (typeof window.AMap === 'undefined') {
+    if (typeof (window as any).AMap === 'undefined') {
       message.error('地图服务加载失败，请检查网络连接')
       setLoading(false)
       return
@@ -111,7 +113,7 @@ export default function HouseMap({
 
     try {
       // 创建地图实例
-      const map = new window.AMap.Map(mapRef.current, {
+      const map = new (window as any).AMap.Map(mapRef.current, {
         center: MAP_CONFIG.center,
         zoom: MAP_CONFIG.zoom,
         mapStyle: MAP_CONFIG.mapStyle,
@@ -124,8 +126,8 @@ export default function HouseMap({
       mapInstanceRef.current = map
 
       // 添加地图控件
-      map.addControl(new window.AMap.Scale())
-      map.addControl(new window.AMap.ToolBar({
+      map.addControl(new (window as any).AMap.Scale())
+      map.addControl(new (window as any).AMap.ToolBar({
         position: 'RB'
       }))
 
@@ -151,27 +153,181 @@ export default function HouseMap({
     }
   }
 
-  // 添加区域边界
-  const addDistrictBoundaries = (map: any) => {
-    QINGDAO_DISTRICTS.forEach(district => {
-      // 创建区域标记
-      const marker = new window.AMap.Marker({
-        position: district.center,
-        content: `<div style="
-          background: rgba(24, 144, 255, 0.1);
-          border: 2px solid #1890ff;
-          border-radius: 4px;
-          padding: 4px 8px;
-          font-size: 12px;
-          color: #1890ff;
-          font-weight: bold;
-          white-space: nowrap;
-        ">${district.name}</div>`,
-        offset: new window.AMap.Pixel(-20, -10),
-      })
-
-      map.add(marker)
+  // 添加区域边界（使用本地 GeoJSON 数据）
+  const addDistrictBoundaries = async (map: any) => {
+  // 清理旧的 polygon
+  if (districtPolygonsRef.current.length > 0) {
+    console.log(`清理现有边界元素: ${districtPolygonsRef.current.length} 个`)
+    districtPolygonsRef.current.forEach((polygon) => map.remove(polygon))
+    districtPolygonsRef.current = []
+  }
+  
+  console.log('=== 开始从本地 GeoJSON 文件绘制青岛市区域边界 ===')
+  
+  try {
+    // 从本地 JSON 文件加载 GeoJSON 数据
+    const response = await fetch('/qingDao.json')
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const geoJsonData = await response.json()
+    console.log('GeoJSON 数据加载成功:', {
+      type: geoJsonData.type,
+      featuresCount: geoJsonData.features?.length || 0
     })
+    
+    if (!geoJsonData.features || !Array.isArray(geoJsonData.features)) {
+      throw new Error('无效的 GeoJSON 数据格式')
+    }
+    
+    let successCount = 0
+    let failedCount = 0
+    
+    // 遍历每个区域特征
+    geoJsonData.features.forEach((feature: any, index: number) => {
+      try {
+        const { properties, geometry, zoneColor, lineColor } = feature
+        const districtName = properties.name
+        const adcode = properties.adcode
+        const center = properties.center
+        
+        console.log(`\n[${index + 1}/${geoJsonData.features.length}] 处理区域: ${districtName}`)
+        console.log(`- 行政代码: ${adcode}`)
+        console.log(`- 中心坐标: [${center.join(', ')}]`)
+        console.log(`- 几何类型: ${geometry.type}`)
+        
+        if (geometry.type === 'MultiPolygon' && geometry.coordinates) {
+          // 处理 MultiPolygon 几何数据
+          geometry.coordinates.forEach((polygon: any, polygonIndex: number) => {
+            polygon.forEach((ring: any, ringIndex: number) => {
+              if (ring && ring.length > 0) {
+                console.log(`  绘制多边形 ${polygonIndex + 1}-${ringIndex + 1}: ${ring.length} 个坐标点`)
+                
+                try {
+                  // 创建高德地图 Polygon
+                  const amapPolygon = new (window as any).AMap.Polygon({
+                    path: ring.map((coord: number[]) => [coord[0], coord[1]]), // [lng, lat]
+                    strokeColor: lineColor || '#ff4d4f',
+                    strokeWeight: 2,
+                    strokeOpacity: 0.8,
+                    fillColor: zoneColor || '#ff4d4f',
+                    fillOpacity: 0.2,
+                    zIndex: 10,
+                  })
+                  
+                  map.add(amapPolygon)
+                  districtPolygonsRef.current.push(amapPolygon)
+                  
+                  console.log(`    ✅ 多边形 ${polygonIndex + 1}-${ringIndex + 1} 绘制成功`)
+                } catch (polygonError) {
+                  console.error(`    ❌ 多边形 ${polygonIndex + 1}-${ringIndex + 1} 绘制失败:`, polygonError)
+                }
+              }
+            })
+          })
+          
+          // 添加区域标签
+          try {
+            const labelMarker = new (window as any).AMap.Text({
+              text: districtName,
+              position: center, // 使用 GeoJSON 中的 center 坐标
+              style: {
+                background: 'rgba(255,255,255,0.85)',
+                border: '1px solid #1890ff',
+                borderRadius: '4px',
+                padding: '2px 6px',
+                color: '#1890ff',
+                fontWeight: '500',
+                fontSize: '11px',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                fontFamily: 'Arial, sans-serif',
+              },
+              offset: new (window as any).AMap.Pixel(-20, -10),
+              zIndex: 20,
+            })
+            
+            map.add(labelMarker)
+            districtPolygonsRef.current.push(labelMarker)
+            console.log(`🏷️ ${districtName} 标签添加成功`)
+            
+            successCount++
+          } catch (labelError) {
+            console.error(`❌ ${districtName} 标签添加失败:`, labelError)
+            failedCount++
+          }
+        } else {
+          console.warn(`⚠️ ${districtName} 几何数据格式不支持:`, geometry.type)
+          failedCount++
+        }
+      } catch (featureError) {
+        console.error(`❌ 处理区域特征失败:`, featureError)
+        failedCount++
+      }
+    })
+    
+    console.log(`\n=== 区域边界绘制完成 ===`)
+    console.log(`成功: ${successCount} 个, 失败: ${failedCount} 个`)
+    console.log(`总计绘制元素: ${districtPolygonsRef.current.length} 个`)
+    
+  } catch (error) {
+    console.error('❌ 加载 GeoJSON 数据失败:', error)
+    message.error('加载区域边界数据失败，请检查网络连接')
+    
+    // 如果加载失败，回退到原来的备用方案
+    console.log('🔄 回退到备用圆形边界方案')
+    QINGDAO_DISTRICTS.forEach(district => {
+      createFallbackBoundary(map, district)
+    })
+  }
+}
+
+  // 创建备用边界的辅助方法
+  const createFallbackBoundary = (map: any, district: any) => {
+    console.log(`🔄 为 ${district.name} 创建备用圆形边界`)
+    
+    try {
+      const circle = new (window as any).AMap.Circle({
+        center: district.center,
+        radius: 5000,
+        strokeColor: '#faad14',
+        strokeWeight: 2,
+        fillColor: '#faad14',
+        fillOpacity: 0.1,
+        zIndex: 5,
+      })
+      
+      map.add(circle)
+      districtPolygonsRef.current.push(circle)
+      console.log(`⭕ ${district.name} 圆形边界创建成功`)
+      
+      // 添加标签
+      const labelMarker = new (window as any).AMap.Text({
+        text: district.name,
+        position: district.center,
+        style: {
+          background: 'rgba(250,173,20,0.85)',
+          border: '1px solid #faad14',
+          borderRadius: '4px',
+          padding: '2px 6px',
+          color: 'white',
+          fontWeight: '500',
+          fontSize: '11px',
+          whiteSpace: 'nowrap',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+          fontFamily: 'Arial, sans-serif',
+        },
+        offset: new (window as any).AMap.Pixel(-20, -10),
+        zIndex: 20,
+      })
+      
+      map.add(labelMarker)
+      districtPolygonsRef.current.push(labelMarker)
+      console.log(`🏷️ ${district.name} 备用标签添加成功`)
+    } catch (fallbackError) {
+      console.error(`❌ ${district.name} 备用边界创建失败:`, fallbackError)
+    }
   }
 
   // 获取农房数据
@@ -231,7 +387,7 @@ export default function HouseMap({
         if (isNaN(lat) || isNaN(lng)) return
 
         // 创建农房标记
-        const marker = new window.AMap.Marker({
+        const marker = new (window as any).AMap.Marker({
           position: [lng, lat],
           content: `<div style="
             width: 20px;
@@ -246,11 +402,11 @@ export default function HouseMap({
             font-size: 10px;
             cursor: pointer;
           ">${STATUS_ICONS[house.constructionStatus]}</div>`,
-          offset: new window.AMap.Pixel(-10, -10),
+          offset: new (window as any).AMap.Pixel(-10, -10),
         })
 
         // 创建信息窗口
-        const infoWindow = new window.AMap.InfoWindow({
+        const infoWindow = new (window as any).AMap.InfoWindow({
           content: `
             <div style="padding: 12px; min-width: 200px;">
               <h4 style="margin: 0 0 8px 0; color: #1890ff;">
@@ -288,7 +444,7 @@ export default function HouseMap({
               </div>
             </div>
           `,
-          offset: new window.AMap.Pixel(0, -30),
+          offset: new (window as any).AMap.Pixel(0, -30),
         })
 
         // 标记点击事件
@@ -354,9 +510,9 @@ export default function HouseMap({
   // 组件挂载时初始化
   useEffect(() => {
     // 动态加载高德地图API
-    if (typeof window.AMap === 'undefined') {
+    if (typeof (window as any).AMap === 'undefined') {
       const script = document.createElement('script')
-      script.src = 'https://webapi.amap.com/maps?v=2.0&key=c279de19cf0a28dda973eba0f749e14f&plugin=AMap.Scale,AMap.ToolBar'
+      script.src = 'https://webapi.amap.com/maps?v=2.0&key=c279de19cf0a28dda973eba0f749e14f&plugin=AMap.Scale,AMap.ToolBar,AMap.DistrictSearch,AMap.Text'
       script.async = true
       script.onload = () => {
         initMap()
@@ -371,10 +527,13 @@ export default function HouseMap({
     }
 
     return () => {
-      // 清理地图实例
+      // 清理地图实例和区边界
       if (mapInstanceRef.current) {
         mapInstanceRef.current.destroy()
         mapInstanceRef.current = null
+      }
+      if (districtPolygonsRef.current.length > 0) {
+        districtPolygonsRef.current = []
       }
     }
   }, [])
