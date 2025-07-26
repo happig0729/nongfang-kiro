@@ -13,6 +13,7 @@ const houseQuerySchema = z.object({
   houseType: z.nativeEnum(HouseType).optional(),
   constructionStatus: z.nativeEnum(ConstructionStatus).optional(),
   search: z.string().optional(),
+  includeSixOnSite: z.string().optional().transform(val => val === 'true'),
 })
 
 // 农房创建数据验证schema
@@ -49,7 +50,7 @@ export const GET = requirePermissions([Permission.HOUSE_VIEW])(
         )
       }
 
-      const { page, limit, regionCode, houseType, constructionStatus, search } = validation.data
+      const { page, limit, regionCode, houseType, constructionStatus, search, includeSixOnSite } = validation.data
 
       // 构建查询条件
       const where: any = {}
@@ -82,25 +83,36 @@ export const GET = requirePermissions([Permission.HOUSE_VIEW])(
       // 分页计算
       const skip = (page - 1) * limit
 
+      // 构建include条件
+      const includeCondition: any = {
+        applicant: {
+          select: {
+            id: true,
+            realName: true,
+            phone: true,
+          }
+        },
+        _count: {
+          select: {
+            housePhotos: true,
+            inspections: true,
+            sixOnSiteRecords: true,
+          }
+        }
+      }
+
+      // 如果需要包含六到场记录
+      if (includeSixOnSite) {
+        includeCondition.sixOnSiteRecords = {
+          orderBy: { scheduledDate: 'desc' }
+        }
+      }
+
       // 查询农房列表
       const [houses, total] = await Promise.all([
         prisma.house.findMany({
           where,
-          include: {
-            applicant: {
-              select: {
-                id: true,
-                realName: true,
-                phone: true,
-              }
-            },
-            _count: {
-              select: {
-                housePhotos: true,
-                inspections: true,
-              }
-            }
-          },
+          include: includeCondition,
           skip,
           take: limit,
           orderBy: { createdAt: 'desc' }

@@ -29,10 +29,12 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   ExclamationCircleOutlined,
+  AuditOutlined,
 } from '@ant-design/icons'
 import type { UploadFile } from 'antd/es/upload/interface'
 import { HouseType, ConstructionStatus, PropertyType, PhotoType, InspectionType, InspectionResult } from '../../../generated/prisma'
 import ConstructionProgress from './ConstructionProgress'
+import SixOnSiteManagement from './SixOnSiteManagement'
 
 const { Option } = Select
 
@@ -493,6 +495,21 @@ export default function HouseDetail({ houseId, onEdit }: HouseDetailProps) {
                     // 刷新数据
                     fetchHouseDetail()
                   }}
+                />
+              )
+            },
+            {
+              key: 'six-on-site',
+              label: (
+                <span>
+                  <AuditOutlined />
+                  六到场管理
+                </span>
+              ),
+              children: (
+                <SixOnSiteManagement
+                  houseId={houseId}
+                  houseAddress={house.address}
                 />
               )
             },
