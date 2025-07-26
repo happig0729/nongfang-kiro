@@ -5,42 +5,42 @@ export enum Permission {
   // 系统管理权限
   SYSTEM_ADMIN = 'system:admin',
   USER_MANAGE = 'user:manage',
-  
+
   // 农房管理权限
   HOUSE_VIEW = 'house:view',
   HOUSE_CREATE = 'house:create',
   HOUSE_EDIT = 'house:edit',
   HOUSE_DELETE = 'house:delete',
   HOUSE_APPROVE = 'house:approve',
-  
+
   // 工匠管理权限
   CRAFTSMAN_VIEW = 'craftsman:view',
   CRAFTSMAN_CREATE = 'craftsman:create',
   CRAFTSMAN_EDIT = 'craftsman:edit',
   CRAFTSMAN_DELETE = 'craftsman:delete',
   CRAFTSMAN_APPROVE = 'craftsman:approve',
-  
+
   // 培训管理权限
   TRAINING_VIEW = 'training:view',
   TRAINING_CREATE = 'training:create',
   TRAINING_EDIT = 'training:edit',
   TRAINING_DELETE = 'training:delete',
-  
+
   // 信用评价权限
   CREDIT_VIEW = 'credit:view',
   CREDIT_EVALUATE = 'credit:evaluate',
   CREDIT_MANAGE = 'credit:manage',
-  
+
   // 质量监管权限
   INSPECTION_VIEW = 'inspection:view',
   INSPECTION_CREATE = 'inspection:create',
   INSPECTION_EDIT = 'inspection:edit',
   INSPECTION_CONDUCT = 'inspection:conduct',
-  
+
   // 数据统计权限
   STATISTICS_VIEW = 'statistics:view',
   STATISTICS_EXPORT = 'statistics:export',
-  
+
   // 个人信息权限
   PROFILE_VIEW = 'profile:view',
   PROFILE_EDIT = 'profile:edit',
@@ -50,7 +50,7 @@ export enum Permission {
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   // 超级管理员 - 拥有所有权限
   [UserRole.SUPER_ADMIN]: Object.values(Permission),
-  
+
   // 市级管理员 - 拥有大部分管理权限
   [UserRole.CITY_ADMIN]: [
     Permission.USER_MANAGE,
@@ -77,7 +77,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.PROFILE_VIEW,
     Permission.PROFILE_EDIT,
   ],
-  
+
   // 区市管理员 - 区域管理权限
   [UserRole.DISTRICT_ADMIN]: [
     Permission.HOUSE_VIEW,
@@ -101,7 +101,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.PROFILE_VIEW,
     Permission.PROFILE_EDIT,
   ],
-  
+
   // 镇街管理员 - 基础管理权限
   [UserRole.TOWN_ADMIN]: [
     Permission.HOUSE_VIEW,
@@ -120,7 +120,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.PROFILE_VIEW,
     Permission.PROFILE_EDIT,
   ],
-  
+
   // 村级管理员 - 村级数据管理
   [UserRole.VILLAGE_ADMIN]: [
     Permission.HOUSE_VIEW,
@@ -134,7 +134,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.PROFILE_VIEW,
     Permission.PROFILE_EDIT,
   ],
-  
+
   // 工匠 - 个人信息和相关业务
   [UserRole.CRAFTSMAN]: [
     Permission.HOUSE_VIEW,
@@ -144,7 +144,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.PROFILE_VIEW,
     Permission.PROFILE_EDIT,
   ],
-  
+
   // 农户 - 基础查看权限
   [UserRole.FARMER]: [
     Permission.HOUSE_VIEW,
@@ -154,7 +154,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.PROFILE_VIEW,
     Permission.PROFILE_EDIT,
   ],
-  
+
   // 检查员 - 检查相关权限
   [UserRole.INSPECTOR]: [
     Permission.HOUSE_VIEW,
@@ -196,17 +196,17 @@ export function canAccessRegion(userRole: UserRole, userRegionCode: string, targ
   if (userRole === UserRole.SUPER_ADMIN || userRole === UserRole.CITY_ADMIN) {
     return true
   }
-  
+
   // 区市管理员可以访问本区市及下属镇街的数据
   if (userRole === UserRole.DISTRICT_ADMIN) {
     return targetRegionCode.startsWith(userRegionCode)
   }
-  
+
   // 镇街管理员只能访问本镇街的数据
   if (userRole === UserRole.TOWN_ADMIN) {
     return targetRegionCode === userRegionCode
   }
-  
+
   // 村级管理员、工匠、农户、检查员只能访问自己区域的数据
   return userRegionCode === targetRegionCode
 }
@@ -240,6 +240,44 @@ export function getRoleDisplayName(role: UserRole): string {
     [UserRole.FARMER]: '农户',
     [UserRole.INSPECTOR]: '检查员',
   }
-  
+
   return roleNames[role] || '未知角色'
+}
+
+// 简化的权限检查函数，用于API路由
+export function checkPermission(userRole: UserRole, resource: string, action: string): boolean {
+  // 构建权限字符串
+  const permissionKey = `${resource.toUpperCase()}_${action.toUpperCase()}` as keyof typeof Permission
+  const permission = Permission[permissionKey]
+
+  if (!permission) {
+    // 如果权限不存在，检查一些常见的映射
+    const mappings: Record<string, Permission> = {
+      'craftsman_read': Permission.CRAFTSMAN_VIEW,
+      'craftsman_create': Permission.CRAFTSMAN_CREATE,
+      'craftsman_update': Permission.CRAFTSMAN_EDIT,
+      'craftsman_delete': Permission.CRAFTSMAN_DELETE,
+      'team_read': Permission.CRAFTSMAN_VIEW, // 团队管理属于工匠管理的一部分
+      'team_create': Permission.CRAFTSMAN_CREATE,
+      'team_update': Permission.CRAFTSMAN_EDIT,
+      'team_delete': Permission.CRAFTSMAN_DELETE,
+      'training_read': Permission.TRAINING_VIEW,
+      'training_create': Permission.TRAINING_CREATE,
+      'training_update': Permission.TRAINING_EDIT,
+      'training_delete': Permission.TRAINING_DELETE,
+      'house_read': Permission.HOUSE_VIEW,
+      'house_create': Permission.HOUSE_CREATE,
+      'house_update': Permission.HOUSE_EDIT,
+      'house_delete': Permission.HOUSE_DELETE,
+    }
+
+    const mappedPermission = mappings[`${resource}_${action}`]
+    if (mappedPermission) {
+      return hasPermission(userRole, mappedPermission)
+    }
+
+    return false
+  }
+
+  return hasPermission(userRole, permission)
 }

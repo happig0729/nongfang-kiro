@@ -51,6 +51,44 @@ export function verifyToken(token: string): JWTPayload | null {
   }
 }
 
+// 从请求中验证用户身份
+export async function verifyTokenFromRequest(req: Request): Promise<AuthUser | null> {
+  try {
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return null
+    }
+
+    const token = authHeader.substring(7) // 移除 'Bearer ' 前缀
+    const payload = verifyToken(token)
+    if (!payload) {
+      return null
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: {
+        id: true,
+        username: true,
+        realName: true,
+        role: true,
+        regionCode: true,
+        regionName: true,
+        status: true,
+      }
+    })
+
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      return null
+    }
+
+    return user
+  } catch (error) {
+    console.error('Verify token from request error:', error)
+    return null
+  }
+}
+
 // 用户登录
 export async function authenticateUser(username: string, password: string): Promise<{
   success: boolean

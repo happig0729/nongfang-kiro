@@ -20,6 +20,12 @@
 │   │   ├── auth/            # Authentication components
 │   │   ├── houses/          # 农房管理相关组件
 │   │   ├── craftsmen/       # 工匠管理相关组件
+│   │   │   ├── CraftsmanManagement.tsx  # 工匠管理主界面
+│   │   │   ├── CraftsmanForm.tsx        # 工匠表单组件
+│   │   │   ├── CraftsmanDetail.tsx      # 工匠详情组件
+│   │   │   ├── TrainingManagement.tsx   # 培训管理主界面
+│   │   │   ├── TrainingForm.tsx         # 培训记录表单组件
+│   │   │   └── TrainingDetail.tsx       # 培训记录详情组件
 │   │   ├── maps/            # 地图相关组件
 │   │   └── ui/              # shadcn/ui components (auto-generated)
 │   └── lib/                 # Utility functions and shared logic
