@@ -27,10 +27,12 @@ import {
   StarOutlined,
   TrophyOutlined,
   BookOutlined,
+  CreditCardOutlined,
 } from '@ant-design/icons'
 import CraftsmanForm from './CraftsmanForm'
 import CraftsmanDetail from './CraftsmanDetail'
 import TrainingManagement from './TrainingManagement'
+import CreditManagement from './CreditManagement'
 
 const { Search } = Input
 const { Option } = Select
@@ -87,9 +89,11 @@ export default function CraftsmanManagement({ currentUser }: CraftsmanManagement
   const [isFormModalVisible, setIsFormModalVisible] = useState(false)
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false)
   const [isTrainingModalVisible, setIsTrainingModalVisible] = useState(false)
+  const [isCreditModalVisible, setIsCreditModalVisible] = useState(false)
   const [editingCraftsman, setEditingCraftsman] = useState<Craftsman | null>(null)
   const [selectedCraftsman, setSelectedCraftsman] = useState<Craftsman | null>(null)
   const [trainingCraftsman, setTrainingCraftsman] = useState<Craftsman | null>(null)
+  const [creditCraftsman, setCreditCraftsman] = useState<Craftsman | null>(null)
 
   // 获取工匠列表
   const fetchCraftsmen = async (page = 1, pageSize = 20) => {
@@ -368,6 +372,16 @@ export default function CraftsmanManagement({ currentUser }: CraftsmanManagement
               }}
             />
           </Tooltip>
+          <Tooltip title="信用管理">
+            <Button
+              type="text"
+              icon={<CreditCardOutlined />}
+              onClick={() => {
+                setCreditCraftsman(record)
+                setIsCreditModalVisible(true)
+              }}
+            />
+          </Tooltip>
           <Tooltip title="编辑">
             <Button
               type="text"
@@ -596,6 +610,31 @@ export default function CraftsmanManagement({ currentUser }: CraftsmanManagement
             onClose={() => {
               setIsTrainingModalVisible(false)
               setTrainingCraftsman(null)
+              fetchCraftsmen(pagination.current, pagination.pageSize) // 刷新工匠列表数据
+            }}
+          />
+        )}
+      </Modal>
+
+      {/* 信用管理模态框 */}
+      <Modal
+        title="信用管理"
+        open={isCreditModalVisible}
+        onCancel={() => {
+          setIsCreditModalVisible(false)
+          setCreditCraftsman(null)
+        }}
+        footer={null}
+        width={1200}
+        destroyOnClose
+      >
+        {creditCraftsman && (
+          <CreditManagement
+            craftsmanId={creditCraftsman.id}
+            craftsmanName={creditCraftsman.name}
+            onClose={() => {
+              setIsCreditModalVisible(false)
+              setCreditCraftsman(null)
               fetchCraftsmen(pagination.current, pagination.pageSize) // 刷新工匠列表数据
             }}
           />
