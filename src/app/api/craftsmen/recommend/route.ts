@@ -281,7 +281,7 @@ function generateRecommendReasons(craftsman: any): string[] {
 
   // 最近表现推荐理由
   const recentPositiveEvaluations = craftsman.creditEvaluations.filter(
-    (eval: any) => eval.pointsChange > 0
+    (evaluation: any) => evaluation.pointsChange > 0
   ).length
   if (recentPositiveEvaluations >= 2) {
     reasons.push('近期表现优秀，获得多次好评')

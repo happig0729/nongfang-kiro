@@ -19,6 +19,8 @@ model User {
   realName    String   @map("real_name") @db.VarChar(100)
   phone       String?  @db.VarChar(20)
   email       String?  @db.VarChar(100)
+  idNumber    String?  @unique @map("id_number") @db.VarChar(18)
+  address     String?  @db.VarChar(500)
   role        UserRole
   regionCode  String   @map("region_code") @db.VarChar(20)
   regionName  String   @map("region_name") @db.VarChar(100)
@@ -28,9 +30,12 @@ model User {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // 关联关系
-  appliedHouses     House[]           @relation("HouseApplicant")
-  inspections       Inspection[]      @relation("Inspector")
-  creditEvaluations CreditEvaluation[] @relation("Evaluator")
+  appliedHouses       House[]           @relation("HouseApplicant")
+  inspections         Inspection[]      @relation("Inspector")
+  creditEvaluations   CreditEvaluation[] @relation("Evaluator")
+  dataEntries         DataEntry[]       @relation("DataEntrySubmitter")
+  reviewedDataEntries DataEntry[]       @relation("DataEntryReviewer")
+  dataEntryDrafts     DataEntryDraft[]  @relation("DataEntryDraftUser")
   
   @@index([regionCode])
   @@index([role])
@@ -55,6 +60,7 @@ model House {
   propertyType       PropertyType?     @map("property_type")
   approvalNumber     String?           @map("approval_number") @db.VarChar(100)
   completionDate     DateTime?         @map("completion_date") @db.Date
+  remarks            String?           @db.Text
   createdAt          DateTime          @default(now()) @map("created_at")
   updatedAt          DateTime          @updatedAt @map("updated_at")
 
@@ -64,6 +70,7 @@ model House {
   inspections         Inspection[]
   housePhotos         HousePhoto[]
   sixOnSiteRecords    SixOnSiteRecord[]
+  dataEntries         DataEntry[]
   
   @@index([regionCode])
   @@index([constructionStatus])
@@ -303,7 +310,115 @@ model SatisfactionSurvey {
   @@map("satisfaction_surveys")
 }
 
-// 系统日志表 - 操作审计
+// 村庄填报端口表 - PC端数据采集工具
+model VillagePortal {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  villageName   String   @map("village_name") @db.VarChar(100)
+  villageCode   String   @unique @map("village_code") @db.VarChar(20)
+  regionCode    String   @map("region_code") @db.VarChar(20)
+  portalUrl     String   @map("portal_url") @db.VarChar(200)
+  isActive      Boolean  @default(true) @map("is_active")
+  dataTemplates String[] @map("data_templates") // 数据模板配置
+  permissions   String[] // 权限配置
+  createdBy     String   @map("created_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  dataEntries      DataEntry[]
+  dataEntryDrafts  DataEntryDraft[]
+  
+  @@index([regionCode])
+  @@index([villageCode])
+  @@index([isActive])
+  @@map("village_portals")
+}
+
+// 数据条目表 - 提交的数据记录
+model DataEntry {
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  villageCode  String      @map("village_code") @db.VarChar(20)
+  houseId      String?     @map("house_id") @db.Uuid
+  submittedBy  String      @map("submitted_by") @db.Uuid
+  formData     Json        @map("form_data") // 表单数据
+  status       EntryStatus @default(SUBMITTED)
+  reviewedBy   String?     @map("reviewed_by") @db.Uuid
+  reviewedAt   DateTime?   @map("reviewed_at")
+  reviewNotes  String?     @map("review_notes") @db.Text
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  // 关联关系
+  village     VillagePortal @relation(fields: [villageCode], references: [villageCode])
+  house       House?        @relation(fields: [houseId], references: [id])
+  submitter   User          @relation("DataEntrySubmitter", fields: [submittedBy], references: [id])
+  reviewer    User?         @relation("DataEntryReviewer", fields: [reviewedBy], references: [id])
+  
+  @@index([villageCode])
+  @@index([status])
+  @@index([createdAt])
+  @@map("data_entries")
+}
+
+// 数据条目草稿表 - 草稿数据保存
+model DataEntryDraft {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  villageCode  String   @map("village_code") @db.VarChar(20)
+  userId       String   @map("user_id") @db.Uuid
+  currentStep  Int      @default(0) @map("current_step")
+  formData     Json     @map("form_data") // 表单数据
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  village VillagePortal @relation(fields: [villageCode], references: [villageCode])
+  user    User          @relation("DataEntryDraftUser", fields: [userId], references: [id])
+  
+  @@unique([villageCode, userId], name: "villageCode_userId")
+  @@index([villageCode])
+  @@index([userId])
+  @@map("data_entry_drafts")
+}
+
+// 数据模板表 - 数据采集模板管理
+model DataTemplate {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @db.VarChar(100)
+  type        String   @db.VarChar(50) // house_basic, house_construction, craftsman_info, etc.
+  fields      Json     // 字段配置
+  isActive    Boolean  @default(true) @map("is_active")
+  usageCount  Int      @default(0) @map("usage_count")
+  createdBy   String   @map("created_by") @db.Uuid
+  lastUsedAt  DateTime? @map("last_used_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([type])
+  @@index([isActive])
+  @@map("data_templates")
+}
+
+// 审计日志表 - 操作审计
+model AuditLog {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  action     String    @db.VarChar(50) // CREATE, UPDATE, DELETE, etc.
+  resource   String    @db.VarChar(50) // house, craftsman, village_portal, etc.
+  resourceId String    @map("resource_id") @db.VarChar(100)
+  details    Json?     // 操作详情
+  ipAddress  String?   @map("ip_address") @db.VarChar(45)
+  userAgent  String?   @map("user_agent") @db.Text
+  status     LogStatus @default(SUCCESS)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// 系统日志表 - 操作审计 (保留兼容性)
 model SystemLog {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String?  @map("user_id") @db.Uuid
@@ -481,4 +596,18 @@ enum OnSiteStatus {
   DELAYED      // 延期
   CANCELLED    // 已取消
   RESCHEDULED  // 重新安排
+}
+
+enum EntryStatus {
+  SUBMITTED    // 已提交
+  REVIEWED     // 已审核
+  APPROVED     // 已批准
+  REJECTED     // 已拒绝
+  PROCESSING   // 处理中
+}
+
+enum LogStatus {
+  SUCCESS      // 成功
+  FAILED       // 失败
+  PARTIAL_SUCCESS // 部分成功
 }

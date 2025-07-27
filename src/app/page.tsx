@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { Layout, Menu, Button, Avatar, Dropdown, Space, Typography } from 'antd'
-import { UserOutlined, LogoutOutlined, SettingOutlined, TeamOutlined, HomeOutlined, ToolOutlined, SafetyOutlined } from '@ant-design/icons'
+import { UserOutlined, LogoutOutlined, SettingOutlined, TeamOutlined, HomeOutlined, ToolOutlined, SafetyOutlined, DatabaseOutlined } from '@ant-design/icons'
 import LoginForm from '@/components/auth/LoginForm'
 import UserManagement from '@/components/auth/UserManagement'
 import HouseManagement from '@/components/houses/HouseManagement'
 import CraftsmanManagement from '@/components/craftsmen/CraftsmanManagement'
 import QualitySupervisionManagement from '@/components/quality/QualitySupervisionManagement'
+import DataCollectionManagement from '@/components/data-collection/DataCollectionManagement'
 import { getRoleDisplayName } from '@/lib/permissions'
 
 const { Header, Sider, Content } = Layout
@@ -94,6 +95,11 @@ export default function Home() {
       label: '质量安全监管',
     },
     {
+      key: 'data-collection',
+      icon: <DatabaseOutlined />,
+      label: 'PC端数据采集',
+    },
+    {
       key: 'users',
       icon: <TeamOutlined />,
       label: '用户管理',
@@ -113,6 +119,8 @@ export default function Home() {
         return <CraftsmanManagement currentUser={currentUser} />
       case 'quality':
         return <QualitySupervisionManagement currentUser={currentUser} />
+      case 'data-collection':
+        return <DataCollectionManagement />
       case 'users':
         return <UserManagement token={token} currentUser={currentUser} />
       case 'dashboard':
@@ -143,8 +151,40 @@ export default function Home() {
                     <li>• 乡村建设工匠培训</li>
                     <li>• 工匠信用评价系统</li>
                     <li>• 质量安全监督管理</li>
+                    <li>• PC端数据采集工具</li>
                     <li>• 数据统计分析</li>
                   </ul>
+                </div>
+
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <Title level={4} className="text-purple-600 mb-2">快速操作</Title>
+                  <Space wrap>
+                    <Button 
+                      type="primary" 
+                      icon={<DatabaseOutlined />}
+                      onClick={() => setSelectedMenu('data-collection')}
+                    >
+                      PC端数据采集
+                    </Button>
+                    <Button 
+                      icon={<HomeOutlined />}
+                      onClick={() => setSelectedMenu('houses')}
+                    >
+                      农房管理
+                    </Button>
+                    <Button 
+                      icon={<ToolOutlined />}
+                      onClick={() => setSelectedMenu('craftsmen')}
+                    >
+                      工匠管理
+                    </Button>
+                    <Button 
+                      icon={<SafetyOutlined />}
+                      onClick={() => setSelectedMenu('quality')}
+                    >
+                      质量监管
+                    </Button>
+                  </Space>
                 </div>
 
                 {(currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'CITY_ADMIN') && (
