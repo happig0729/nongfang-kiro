@@ -92,6 +92,34 @@ if (!validation.success) {
 - **HTTPS**: 生产环境强制使用HTTPS
 - **SQL注入**: 使用Prisma ORM防止SQL注入
 
+## UI设计规范
+- **设计理念**: 简洁至上，专注Web端桌面应用
+- **配色方案**: 白色背景 + 黑色/深灰色文字的浅色主题
+- **信息架构**: 避免信息重复显示，建立清晰的视觉层次
+- **CSS优先级**: 使用内联样式覆盖组件库默认样式
+- **响应式设计**: Web端应用不需要复杂的移动端适配
+
+### UI开发最佳实践
+```typescript
+// 1. 使用内联样式覆盖Ant Design默认样式
+<Header style={{ backgroundColor: '#ffffff', color: '#000000' }}>
+
+// 2. 避免信息重复显示
+// 错误：多处显示相同信息
+<div>{userRole}</div>  // 位置1
+<div>{userRole}</div>  // 位置2 - 重复！
+
+// 正确：统一信息显示位置
+<div>{userRole}</div>  // 只在一个合适的位置显示
+
+// 3. 专注Web端设计，避免不必要的响应式类名
+// 错误：Web端不需要复杂响应式
+<div className="hidden md:flex lg:block">
+
+// 正确：简洁的Web端设计
+<div className="flex">
+```
+
 ## 性能要求
 - **页面加载**: 首屏加载时间 < 3秒
 - **API响应**: 95%的API请求响应时间 < 2秒

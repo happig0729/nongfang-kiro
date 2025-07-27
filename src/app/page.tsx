@@ -52,8 +52,8 @@ export default function Home() {
       dashboard: { title: '仪表板', icon: <BarChartOutlined /> },
       houses: { title: '农房管理', icon: <HomeOutlined /> },
       craftsmen: { title: '工匠管理', icon: <ToolOutlined /> },
-      quality: { title: '质量安全监管', icon: <SafetyOutlined /> },
-      'data-collection': { title: 'PC端数据采集', icon: <DatabaseOutlined /> },
+      quality: { title: '质量安全', icon: <SafetyOutlined /> },
+      'data-collection': { title: '数据采集', icon: <DatabaseOutlined /> },
       users: { title: '用户管理', icon: <TeamOutlined /> },
     }
 

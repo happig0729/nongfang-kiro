@@ -25,7 +25,7 @@ const QualitySupervisionManagement: React.FC<QualitySupervisionManagementProps> 
     <div style={{ padding: '24px' }}>
       {/* 页面标题 */}
       <div style={{ marginBottom: 16 }}>
-        <Title level={2}>质量安全监管</Title>
+        <Title level={2}>质量安全</Title>
         <p style={{ color: '#666', marginBottom: 0 }}>
           农房建设质量安全监督管理系统，包含六到场管理、质量检查、满意度调查等功能
         </p>

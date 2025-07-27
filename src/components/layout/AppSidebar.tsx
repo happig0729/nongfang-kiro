@@ -51,7 +51,7 @@ export default function AppSidebar({
       {
         key: 'quality',
         icon: <SafetyOutlined />,
-        label: '质量安全监管',
+        label: '质量安全',
       },
     ]
 
@@ -60,7 +60,7 @@ export default function AppSidebar({
       {
         key: 'data-collection',
         icon: <DatabaseOutlined />,
-        label: 'PC端数据采集',
+        label: '数据采集',
       },
       {
         key: 'users',
