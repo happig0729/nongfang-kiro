@@ -22,7 +22,16 @@ interface PreviewData {
   [key: string]: any
 }
 
-export default function BatchImport() {
+interface BatchImportProps {
+  currentUser: {
+    id: string
+    role: string
+    regionCode: string
+    realName: string
+  }
+}
+
+export default function BatchImport({ currentUser }: BatchImportProps) {
   const [currentStep, setCurrentStep] = useState(0)
   const [uploading, setUploading] = useState(false)
   const [importing, setImporting] = useState(false)

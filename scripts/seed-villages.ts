@@ -70,7 +70,7 @@ async function seedVillages() {
         
         console.log(`✅ 创建村庄: ${village.villageName} (${village.villageCode})`)
       } catch (error) {
-        console.log(`❌ 创建村庄失败: ${villageData.villageName} - ${error.message}`)
+        console.log(`❌ 创建村庄失败: ${villageData.villageName} - ${error instanceof Error ? error.message : String(error)}`)
       }
     }
     

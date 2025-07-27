@@ -9,6 +9,7 @@ import HouseManagement from '@/components/houses/HouseManagement'
 import CraftsmanManagement from '@/components/craftsmen/CraftsmanManagement'
 import QualitySupervisionManagement from '@/components/quality/QualitySupervisionManagement'
 import DataCollectionManagement from '@/components/data-collection/DataCollectionManagement'
+import Dashboard from '@/components/dashboard/Dashboard'
 import { getRoleDisplayName } from '@/lib/permissions'
 
 const { Header, Sider, Content } = Layout
@@ -120,90 +121,12 @@ export default function Home() {
       case 'quality':
         return <QualitySupervisionManagement currentUser={currentUser} />
       case 'data-collection':
-        return <DataCollectionManagement />
+        return <DataCollectionManagement currentUser={currentUser} />
       case 'users':
         return <UserManagement token={token} currentUser={currentUser} />
       case 'dashboard':
       default:
-        return (
-          <div className="p-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <Title level={2}>欢迎使用青岛市农房建设管理平台</Title>
-              <div className="mt-4 space-y-4">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <Title level={4} className="text-blue-600 mb-2">当前用户信息</Title>
-                  <Space direction="vertical">
-                    <Text><strong>姓名：</strong>{currentUser?.realName}</Text>
-                    <Text><strong>角色：</strong>{getRoleDisplayName(currentUser?.role)}</Text>
-                    <Text><strong>区域：</strong>{currentUser?.regionName}</Text>
-                    <Text><strong>状态：</strong>
-                      <span className="text-green-600 ml-1">
-                        {currentUser?.status === 'ACTIVE' ? '活跃' : currentUser?.status}
-                      </span>
-                    </Text>
-                  </Space>
-                </div>
-                
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <Title level={4} className="text-green-600 mb-2">系统功能</Title>
-                  <ul className="space-y-2">
-                    <li>• 农房建设信息管理</li>
-                    <li>• 乡村建设工匠培训</li>
-                    <li>• 工匠信用评价系统</li>
-                    <li>• 质量安全监督管理</li>
-                    <li>• PC端数据采集工具</li>
-                    <li>• 数据统计分析</li>
-                  </ul>
-                </div>
-
-                <div className="bg-purple-50 p-4 rounded-lg">
-                  <Title level={4} className="text-purple-600 mb-2">快速操作</Title>
-                  <Space wrap>
-                    <Button 
-                      type="primary" 
-                      icon={<DatabaseOutlined />}
-                      onClick={() => setSelectedMenu('data-collection')}
-                    >
-                      PC端数据采集
-                    </Button>
-                    <Button 
-                      icon={<HomeOutlined />}
-                      onClick={() => setSelectedMenu('houses')}
-                    >
-                      农房管理
-                    </Button>
-                    <Button 
-                      icon={<ToolOutlined />}
-                      onClick={() => setSelectedMenu('craftsmen')}
-                    >
-                      工匠管理
-                    </Button>
-                    <Button 
-                      icon={<SafetyOutlined />}
-                      onClick={() => setSelectedMenu('quality')}
-                    >
-                      质量监管
-                    </Button>
-                  </Space>
-                </div>
-
-                {(currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'CITY_ADMIN') && (
-                  <div className="bg-orange-50 p-4 rounded-lg">
-                    <Title level={4} className="text-orange-600 mb-2">管理员功能</Title>
-                    <p>您拥有管理员权限，可以访问用户管理等高级功能。</p>
-                    <Button 
-                      type="primary" 
-                      className="mt-2"
-                      onClick={() => setSelectedMenu('users')}
-                    >
-                      进入用户管理
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )
+        return <Dashboard currentUser={currentUser} />
     }
   }
 

@@ -132,7 +132,7 @@ async function testDataSubmission() {
             idNumber: testData.data.craftsmanIdNumber,
             phone: testData.data.craftsmanPhone,
             specialties: testData.data.specialties || [],
-            skillLevel: testData.data.skillLevel || 'INTERMEDIATE',
+            skillLevel: testData.data.skillLevel || 'INTERMEDIATE' as any,
             regionCode: testUser.regionCode,
             regionName: testUser.regionName || '青岛市',
             status: 'ACTIVE',

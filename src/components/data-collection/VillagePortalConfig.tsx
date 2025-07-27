@@ -33,7 +33,16 @@ const REGION_OPTIONS = [
   { value: '370206', label: '青岛市胶州市' },
 ]
 
-export default function VillagePortalConfig() {
+interface VillagePortalConfigProps {
+  currentUser: {
+    id: string
+    role: string
+    regionCode: string
+    realName: string
+  }
+}
+
+export default function VillagePortalConfig({ currentUser }: VillagePortalConfigProps) {
   const [villages, setVillages] = useState<VillagePortal[]>([])
   const [loading, setLoading] = useState(false)
   const [isModalVisible, setIsModalVisible] = useState(false)
