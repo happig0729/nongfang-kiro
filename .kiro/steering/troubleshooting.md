@@ -778,4 +778,846 @@ useEffect(() => {
   console.log('Training records updated:', trainingRecords)
   console.log('Filters changed:', filters)
 }, [trainingRecords, filters])
+```##
+ 质量安全监管系统相关问题
+
+### 1. 六到场管理问题
+
+#### API认证失败
+**错误信息**: `GET /api/houses/[id]/six-on-site 401 (Unauthorized)`
+**原因**: 前端API调用缺少认证token
+**解决方案**:
+```typescript
+// 确保所有API调用都包含认证token
+const response = await fetch(`/api/houses/${houseId}/six-on-site?${params}`, {
+  headers: {
+    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+  },
+})
 ```
+
+#### 六到场记录重复创建
+**问题**: 同一农房的同一类型到场记录被重复创建
+**解决方案**: API层面添加重复检查
+```typescript
+const existingRecord = await prisma.sixOnSiteRecord.findFirst({
+  where: {
+    houseId,
+    onSiteType: data.onSiteType,
+    status: { not: 'CANCELLED' },
+  },
+})
+
+if (existingRecord) {
+  return NextResponse.json(
+    { error: 'DUPLICATE_RECORD', message: '该类型的到场记录已存在' },
+    { status: 400 }
+  )
+}
+```
+
+#### 六到场完成率计算错误
+**问题**: 完成率计算不准确
+**解决方案**: 确保计算逻辑正确
+```typescript
+const getStatistics = () => {
+  const totalTypes = ON_SITE_TYPES.length // 6种类型
+  const completedTypes = new Set(
+    records.filter(r => r.status === 'COMPLETED').map(r => r.onSiteType)
+  ).size
+  const completionRate = totalTypes > 0 ? (completedTypes / totalTypes) * 100 : 0
+  
+  return { totalTypes, completedTypes, completionRate }
+}
+```
+
+### 2. 质量安全检查问题
+
+#### 检查评分验证失败
+**问题**: 检查评分超出0-100范围
+**解决方案**: 添加严格的数据验证
+```typescript
+const createInspectionSchema = z.object({
+  score: z.number().int().min(0, '评分不能小于0').max(100, '评分不能大于100').optional(),
+})
+```
+
+#### 检查结果状态不一致
+**问题**: 检查结果和状态字段不匹配
+**解决方案**: 在业务逻辑中添加一致性检查
+```typescript
+// 检查完成后自动更新状态
+if (data.result && data.result !== 'PENDING') {
+  data.status = 'COMPLETED'
+}
+```
+
+#### 检查照片上传失败
+**问题**: 检查照片无法正确上传和显示
+**解决方案**: 确保文件上传流程正确
+```typescript
+const formData = {
+  ...values,
+  photos: values.photos?.fileList?.map((file: any) => file.response?.url || file.url) || [],
+}
+```
+
+### 3. 满意度调查问题
+
+#### 满意度评分组件显示异常
+**问题**: Rate组件显示不正确或无法交互
+**解决方案**: 确保Rate组件正确配置
+```typescript
+<Form.Item
+  name="overallScore"
+  label="总体满意度"
+  rules={[{ required: true, message: '请选择总体满意度' }]}
+>
+  <Rate />
+</Form.Item>
+```
+
+#### 满意度统计计算错误
+**问题**: 平均满意度计算不准确
+**解决方案**: 使用数据库聚合函数
+```typescript
+const averageScores = await prisma.satisfactionSurvey.aggregate({
+  where: { houseId, status: 'COMPLETED' },
+  _avg: {
+    overallScore: true,
+    qualityScore: true,
+    serviceScore: true,
+    timeScore: true,
+  },
+})
+```
+
+#### 调查类型枚举不匹配
+**问题**: 前端调查类型与数据库枚举不匹配
+**解决方案**: 确保枚举值一致
+```typescript
+// 数据库枚举
+enum SurveyType {
+  NEW_BUILD_SATISFACTION
+  RENOVATION_SATISFACTION
+  EXPANSION_SATISFACTION
+  REPAIR_SATISFACTION
+}
+
+// 前端配置
+const SURVEY_TYPES = [
+  { value: 'NEW_BUILD_SATISFACTION', label: '新建农房满意度' },
+  // ... 其他类型
+]
+```
+
+### 4. 权限控制问题
+
+#### 质量监管权限403错误
+**问题**: 用户无法访问质量监管功能
+**解决方案**: 检查权限映射和角色配置
+```typescript
+// 确保权限映射正确
+const mappings: Record<string, Permission> = {
+  'six_on_site_read': Permission.SIX_ON_SITE_VIEW,
+  'inspection_view': Permission.INSPECTION_VIEW,
+  'house_read': Permission.HOUSE_VIEW, // 质量监管需要农房查看权限
+}
+
+// 检查用户角色权限
+console.log('User quality supervision permissions:', {
+  canViewSixOnSite: checkPermission(user.role, 'six_on_site', 'read'),
+  canViewInspection: checkPermission(user.role, 'inspection', 'view'),
+  canViewHouse: checkPermission(user.role, 'house', 'read'),
+})
+```
+
+#### 区域数据访问限制
+**问题**: 用户看到其他区域的质量监管数据
+**解决方案**: 在API层面添加区域过滤
+```typescript
+// 检查区域权限
+if (user.role !== 'SUPER_ADMIN' && user.role !== 'CITY_ADMIN') {
+  if (!house.regionCode.startsWith(user.regionCode)) {
+    return NextResponse.json({ error: 'FORBIDDEN', message: '无权访问该区域的农房信息' }, { status: 403 })
+  }
+}
+```
+
+### 5. 数据库相关问题
+
+#### 六到场记录外键约束错误
+**问题**: 删除农房时六到场记录外键约束失败
+**解决方案**: 确保级联删除配置正确
+```sql
+-- 在Prisma schema中配置级联删除
+model SixOnSiteRecord {
+  house House @relation(fields: [houseId], references: [id], onDelete: Cascade)
+}
+```
+
+#### 质量监管数据查询性能问题
+**问题**: 大量质量监管数据导致查询缓慢
+**解决方案**: 优化数据库索引和查询
+```sql
+-- 添加必要的索引
+CREATE INDEX idx_six_on_site_house_date ON six_on_site_records(house_id, scheduled_date);
+CREATE INDEX idx_inspections_house_date ON inspections(house_id, inspection_date);
+CREATE INDEX idx_satisfaction_house_date ON satisfaction_surveys(house_id, survey_date);
+```
+
+### 6. 前端组件问题
+
+#### 质量监管页面加载缓慢
+**问题**: 质量监管页面初始加载时间过长
+**解决方案**: 实现懒加载和数据分页
+```typescript
+// 使用React.lazy进行组件懒加载
+const SixOnSiteManagement = React.lazy(() => import('./SixOnSiteManagement'))
+const QualityInspectionManagement = React.lazy(() => import('./QualityInspectionManagement'))
+
+// 在组件中使用Suspense
+<Suspense fallback={<Spin size="large" />}>
+  <SixOnSiteManagement />
+</Suspense>
+```
+
+#### 统计数据不实时更新
+**问题**: 添加记录后统计数据不刷新
+**解决方案**: 在操作完成后刷新数据
+```typescript
+const handleSuccess = () => {
+  setIsFormModalVisible(false)
+  fetchRecords() // 刷新记录列表
+  fetchStatistics() // 刷新统计数据
+}
+```
+
+### 7. 调试技巧
+
+#### 质量监管API调试
+```typescript
+// 在API路由中添加详细日志
+console.log('Quality supervision API request:', {
+  method: req.method,
+  url: req.url,
+  user: user.id,
+  houseId,
+  filters,
+})
+```
+
+#### 权限调试
+```typescript
+// 检查质量监管权限
+console.log('Quality supervision permissions:', {
+  role: user.role,
+  canViewSixOnSite: checkPermission(user.role, 'six_on_site', 'read'),
+  canCreateInspection: checkPermission(user.role, 'inspection', 'create'),
+  canManageSurvey: checkPermission(user.role, 'house', 'update'),
+})
+```
+
+#### 数据统计调试
+```typescript
+// 在统计计算中添加调试信息
+console.log('Statistics calculation:', {
+  totalRecords: records.length,
+  completedRecords: records.filter(r => r.status === 'COMPLETED').length,
+  completionRate: (completedRecords / totalRecords) * 100,
+})
+```
+
+## PC端数据采集工具相关问题
+
+### 1. 村庄填报端口问题
+
+#### 村庄代码重复错误
+**错误信息**: `DUPLICATE_VILLAGE_CODE: 村庄代码已存在`
+**原因**: 尝试创建重复的村庄代码
+**解决方案**:
+```typescript
+// 在创建前检查村庄代码唯一性
+const existingVillage = await prisma.villagePortal.findUnique({
+  where: { villageCode: data.villageCode }
+})
+
+if (existingVillage) {
+  return NextResponse.json(
+    { error: 'DUPLICATE_VILLAGE_CODE', message: '村庄代码已存在' },
+    { status: 400 }
+  )
+}
+```
+
+#### 填报端口访问权限问题
+**问题**: 用户无法访问指定村庄的填报端口
+**解决方案**: 检查用户区域权限和村庄配置
+```typescript
+// 验证用户是否有权限访问该村庄
+const village = await prisma.villagePortal.findUnique({
+  where: { villageCode }
+})
+
+if (!village || !village.isActive) {
+  return NextResponse.json({ error: 'VILLAGE_NOT_FOUND' }, { status: 404 })
+}
+
+if (user.role !== 'SUPER_ADMIN' && !village.regionCode.startsWith(user.regionCode)) {
+  return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 })
+}
+```
+
+### 2. 批量导入问题
+
+#### Excel文件解析失败
+**问题**: 上传的Excel文件无法正确解析
+**原因**: 文件格式不支持或文件损坏
+**解决方案**:
+```typescript
+// 增强文件验证和错误处理
+const readExcelFile = (file: File): Promise<any[]> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer)
+        const workbook = XLSX.read(data, { type: 'array' })
+        
+        if (workbook.SheetNames.length === 0) {
+          throw new Error('Excel文件中没有工作表')
+        }
+        
+        const sheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[sheetName]
+        const jsonData = XLSX.utils.sheet_to_json(worksheet)
+        
+        if (jsonData.length === 0) {
+          throw new Error('Excel文件中没有数据')
+        }
+        
+        resolve(jsonData)
+      } catch (error) {
+        reject(new Error(`文件解析失败: ${error.message}`))
+      }
+    }
+    
+    reader.onerror = () => {
+      reject(new Error('文件读取失败'))
+    }
+    
+    reader.readAsArrayBuffer(file)
+  })
+}
+```
+
+#### 数据验证失败率过高
+**问题**: 批量导入时大量数据验证失败
+**解决方案**: 提供更详细的模板说明和数据预处理
+```typescript
+// 数据预处理和清理
+const preprocessImportData = (data: any[]) => {
+  return data.map((row, index) => {
+    const processedRow = { ...row }
+    
+    // 清理空白字符
+    Object.keys(processedRow).forEach(key => {
+      if (typeof processedRow[key] === 'string') {
+        processedRow[key] = processedRow[key].trim()
+      }
+    })
+    
+    // 数据类型转换
+    if (processedRow['房屋层数']) {
+      processedRow['房屋层数'] = parseInt(processedRow['房屋层数'], 10)
+    }
+    
+    if (processedRow['房屋高度']) {
+      processedRow['房屋高度'] = parseFloat(processedRow['房屋高度'])
+    }
+    
+    // 标准化手机号格式
+    if (processedRow['联系电话']) {
+      processedRow['联系电话'] = processedRow['联系电话'].replace(/\D/g, '')
+    }
+    
+    return processedRow
+  })
+}
+```
+
+### 3. 数据模板管理问题
+
+#### 模板字段配置错误
+**问题**: 模板字段配置不正确导致表单渲染失败
+**解决方案**: 增强模板验证和错误处理
+```typescript
+// 模板字段验证
+const validateTemplateFields = (fields: TemplateField[]) => {
+  const errors: string[] = []
+  
+  fields.forEach((field, index) => {
+    if (!field.name || !field.label) {
+      errors.push(`字段${index + 1}: 名称和标签不能为空`)
+    }
+    
+    if (!['text', 'number', 'date', 'select', 'textarea'].includes(field.type)) {
+      errors.push(`字段${field.name}: 不支持的字段类型`)
+    }
+    
+    if (field.type === 'select' && (!field.options || field.options.length === 0)) {
+      errors.push(`字段${field.name}: 选择类型字段必须提供选项`)
+    }
+    
+    if (field.validation) {
+      if (field.type === 'number' && field.validation.min > field.validation.max) {
+        errors.push(`字段${field.name}: 最小值不能大于最大值`)
+      }
+    }
+  })
+  
+  return errors
+}
+```
+
+#### 模板使用统计不准确
+**问题**: 模板使用次数统计错误
+**解决方案**: 实现准确的使用统计
+```typescript
+// 更新模板使用统计
+const updateTemplateUsage = async (templateId: string) => {
+  await prisma.dataTemplate.update({
+    where: { id: templateId },
+    data: {
+      usageCount: {
+        increment: 1
+      },
+      lastUsedAt: new Date()
+    }
+  })
+}
+
+// 在使用模板时调用
+await updateTemplateUsage(templateId)
+```
+
+### 4. 流程化填报问题
+
+#### 步骤跳转逻辑错误
+**问题**: 用户无法正确跳转到下一步或上一步
+**解决方案**: 完善步骤验证和状态管理
+```typescript
+// 步骤验证逻辑
+const validateCurrentStep = (currentStep: number, formData: any) => {
+  switch (currentStep) {
+    case 0: // 农房基础信息
+      if (!formData.address || !formData.applicantName) {
+        message.error('请填写完整的基础信息')
+        return false
+      }
+      break
+    
+    case 1: // 建设过程信息
+      if (!formData.constructionStatus) {
+        message.error('请选择建设状态')
+        return false
+      }
+      break
+    
+    case 2: // 工匠信息
+      if (formData.constructionStatus === 'UNDER_CONSTRUCTION' && !formData.craftsmanId) {
+        message.error('建设中的农房必须指定工匠')
+        return false
+      }
+      break
+  }
+  
+  return true
+}
+```
+
+#### 草稿保存失败
+**问题**: 用户填写的数据无法保存为草稿
+**解决方案**: 实现可靠的草稿保存机制
+```typescript
+// 自动保存草稿
+const useAutoSave = (villageCode: string, formData: any, interval = 30000) => {
+  useEffect(() => {
+    const timer = setInterval(async () => {
+      if (Object.keys(formData).length > 0) {
+        try {
+          await saveDraft(villageCode, formData)
+          console.log('草稿已自动保存')
+        } catch (error) {
+          console.error('自动保存失败:', error)
+        }
+      }
+    }, interval)
+
+    return () => clearInterval(timer)
+  }, [villageCode, formData, interval])
+}
+
+// 在组件中使用
+useAutoSave(villageCode, formData)
+```
+
+### 5. 权限和审计问题
+
+#### 操作日志记录不完整
+**问题**: 某些操作没有正确记录到审计日志
+**解决方案**: 完善日志记录中间件
+```typescript
+// 审计日志中间件
+const auditMiddleware = (action: string, resource: string) => {
+  return async (req: NextRequest, context: any) => {
+    const user = await verifyTokenFromRequest(req)
+    const startTime = Date.now()
+    
+    try {
+      const result = await context.next()
+      
+      // 记录成功操作
+      await prisma.auditLog.create({
+        data: {
+          userId: user?.id || 'anonymous',
+          action,
+          resource,
+          resourceId: context.params?.id || 'unknown',
+          details: {
+            method: req.method,
+            url: req.url,
+            duration: Date.now() - startTime
+          },
+          ipAddress: req.headers.get('x-forwarded-for') || 'unknown',
+          userAgent: req.headers.get('user-agent') || 'unknown',
+          status: 'SUCCESS'
+        }
+      })
+      
+      return result
+    } catch (error) {
+      // 记录失败操作
+      await prisma.auditLog.create({
+        data: {
+          userId: user?.id || 'anonymous',
+          action,
+          resource,
+          resourceId: context.params?.id || 'unknown',
+          details: {
+            method: req.method,
+            url: req.url,
+            error: error.message,
+            duration: Date.now() - startTime
+          },
+          ipAddress: req.headers.get('x-forwarded-for') || 'unknown',
+          userAgent: req.headers.get('user-agent') || 'unknown',
+          status: 'FAILED'
+        }
+      })
+      
+      throw error
+    }
+  }
+}
+```
+
+#### 权限检查绕过
+**问题**: 某些情况下权限检查被绕过
+**解决方案**: 实现严格的权限检查
+```typescript
+// 严格的权限检查装饰器
+const requirePermission = (resource: string, action: string) => {
+  return (target: any, propertyName: string, descriptor: PropertyDescriptor) => {
+    const method = descriptor.value
+    
+    descriptor.value = async function (...args: any[]) {
+      const req = args[0] as NextRequest
+      const user = await verifyTokenFromRequest(req)
+      
+      if (!user) {
+        return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 })
+      }
+      
+      if (!checkPermission(user.role, resource, action)) {
+        return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 })
+      }
+      
+      return method.apply(this, args)
+    }
+  }
+}
+
+// 使用示例
+class DataCollectionAPI {
+  @requirePermission('data_collection', 'create')
+  async createVillagePortal(req: NextRequest) {
+    // 实现逻辑
+  }
+}
+```
+
+## 移动端小程序相关问题
+
+### 1. 网络连接问题
+
+#### 请求超时处理
+**问题**: 网络不稳定时请求经常超时
+**解决方案**: 实现重试机制和超时处理
+```javascript
+// 带重试的网络请求
+const requestWithRetry = async (options, maxRetries = 3) => {
+  let lastError
+  
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await wx.request({
+        ...options,
+        timeout: 10000 // 10秒超时
+      })
+      
+      return response
+    } catch (error) {
+      lastError = error
+      
+      if (i < maxRetries - 1) {
+        // 等待后重试
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)))
+      }
+    }
+  }
+  
+  throw lastError
+}
+```
+
+#### 离线数据同步失败
+**问题**: 网络恢复后离线数据无法正确同步
+**解决方案**: 改进同步机制
+```javascript
+// 改进的同步管理器
+class SyncManager {
+  async startSync() {
+    if (this.syncing) return
+    
+    this.syncing = true
+    const queue = this.getValidSyncItems()
+    
+    for (let item of queue) {
+      try {
+        await this.syncItemWithRetry(item)
+        this.removeFromQueue(item.id)
+        
+        // 通知用户同步进度
+        wx.showToast({
+          title: `同步中 ${this.getSyncProgress()}%`,
+          icon: 'loading',
+          duration: 1000
+        })
+      } catch (error) {
+        this.handleSyncError(item, error)
+      }
+    }
+    
+    this.syncing = false
+    this.notifySyncComplete()
+  }
+  
+  async syncItemWithRetry(item, maxRetries = 3) {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return await this.syncItem(item)
+      } catch (error) {
+        if (i === maxRetries - 1) throw error
+        await this.delay(1000 * (i + 1))
+      }
+    }
+  }
+}
+```
+
+### 2. 文件上传问题
+
+#### 图片压缩失败
+**问题**: 某些图片无法正确压缩
+**解决方案**: 增强图片处理逻辑
+```javascript
+// 改进的图片压缩
+const compressImage = (src, quality = 0.8) => {
+  return new Promise((resolve, reject) => {
+    wx.compressImage({
+      src: src,
+      quality: quality,
+      success: (res) => {
+        // 检查压缩后的文件大小
+        wx.getFileInfo({
+          filePath: res.tempFilePath,
+          success: (info) => {
+            if (info.size > 5 * 1024 * 1024) { // 5MB
+              // 如果还是太大，进一步压缩
+              if (quality > 0.3) {
+                compressImage(src, quality - 0.2).then(resolve).catch(reject)
+              } else {
+                reject(new Error('图片过大，无法压缩到合适大小'))
+              }
+            } else {
+              resolve(res.tempFilePath)
+            }
+          },
+          fail: reject
+        })
+      },
+      fail: (error) => {
+        // 压缩失败，使用原图
+        console.warn('图片压缩失败，使用原图:', error)
+        resolve(src)
+      }
+    })
+  })
+}
+```
+
+#### 批量上传进度显示
+**问题**: 批量上传时无法显示准确的进度
+**解决方案**: 实现进度跟踪
+```javascript
+// 批量上传进度管理
+class UploadProgressManager {
+  constructor() {
+    this.uploads = new Map()
+  }
+  
+  async uploadMultipleFiles(files) {
+    const totalFiles = files.length
+    let completedFiles = 0
+    const results = []
+    
+    wx.showLoading({ title: '上传中 0%' })
+    
+    for (let i = 0; i < files.length; i++) {
+      try {
+        const result = await this.uploadSingleFile(files[i], (progress) => {
+          const fileProgress = (completedFiles + progress / 100) / totalFiles * 100
+          wx.showLoading({ title: `上传中 ${Math.round(fileProgress)}%` })
+        })
+        
+        results.push(result)
+        completedFiles++
+        
+        const totalProgress = completedFiles / totalFiles * 100
+        wx.showLoading({ title: `上传中 ${Math.round(totalProgress)}%` })
+      } catch (error) {
+        console.error(`文件${i + 1}上传失败:`, error)
+        results.push(null)
+        completedFiles++
+      }
+    }
+    
+    wx.hideLoading()
+    return results
+  }
+  
+  uploadSingleFile(filePath, onProgress) {
+    return new Promise((resolve, reject) => {
+      const uploadTask = wx.uploadFile({
+        url: `${app.globalData.apiUrl}/api/upload`,
+        filePath: filePath,
+        name: 'file',
+        header: {
+          'Authorization': `Bearer ${wx.getStorageSync('token')}`
+        },
+        success: (res) => {
+          const data = JSON.parse(res.data)
+          if (data.success) {
+            resolve(data.data.url)
+          } else {
+            reject(new Error(data.message))
+          }
+        },
+        fail: reject
+      })
+      
+      uploadTask.onProgressUpdate((res) => {
+        onProgress(res.progress)
+      })
+    })
+  }
+}
+```
+
+### 3. 用户体验问题
+
+#### 页面加载缓慢
+**问题**: 某些页面加载时间过长
+**解决方案**: 实现页面预加载和缓存
+```javascript
+// 页面预加载管理
+class PagePreloader {
+  constructor() {
+    this.preloadedPages = new Set()
+  }
+  
+  preloadPage(url) {
+    if (this.preloadedPages.has(url)) return
+    
+    wx.preloadPage({
+      url: url,
+      success: () => {
+        this.preloadedPages.add(url)
+        console.log(`页面预加载成功: ${url}`)
+      },
+      fail: (error) => {
+        console.error(`页面预加载失败: ${url}`, error)
+      }
+    })
+  }
+  
+  preloadCommonPages() {
+    const commonPages = [
+      '/pages/houses/list/index',
+      '/pages/craftsmen/list/index',
+      '/pages/profile/index'
+    ]
+    
+    commonPages.forEach(page => this.preloadPage(page))
+  }
+}
+
+// 在app.js中使用
+const preloader = new PagePreloader()
+preloader.preloadCommonPages()
+```
+
+#### 表单数据丢失
+**问题**: 用户填写表单时意外退出导致数据丢失
+**解决方案**: 实现表单数据自动保存
+```javascript
+// 表单自动保存
+const useFormAutoSave = (formKey, formData, interval = 5000) => {
+  const saveTimer = setInterval(() => {
+    if (Object.keys(formData).length > 0) {
+      wx.setStorageSync(`form_draft_${formKey}`, {
+        data: formData,
+        timestamp: Date.now()
+      })
+    }
+  }, interval)
+  
+  return {
+    clearAutoSave: () => {
+      clearInterval(saveTimer)
+      wx.removeStorageSync(`form_draft_${formKey}`)
+    },
+    
+    loadDraft: () => {
+      const draft = wx.getStorageSync(`form_draft_${formKey}`)
+      if (draft && Date.now() - draft.timestamp < 24 * 60 * 60 * 1000) { // 24小时内
+        return draft.data
+      }
+      return null
+    }
+  }
+}
+```
+
+这些问题排查指南涵盖了PC端数据采集工具和移动端小程序开发中的常见问题，为开发和维护提供了实用的解决方案。

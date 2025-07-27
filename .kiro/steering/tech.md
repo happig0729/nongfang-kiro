@@ -553,4 +553,522 @@ const CraftsmanManagement = () => {
     />
   </Modal>
 }
+```## Quality
+ and Safety Supervision Implementation
+
+### Six On-Site Management System
+```typescript
+// Six on-site record creation with validation
+const createSixOnSiteSchema = z.object({
+  onSiteType: z.enum(['SURVEY', 'DESIGN', 'CONSTRUCTION', 'SUPERVISION', 'BUILDING', 'QUALITY']),
+  scheduledDate: z.string().transform((str) => new Date(str)),
+  responsibleUnit: z.string().min(1).max(200),
+  contactPerson: z.string().min(1).max(100),
+  contactPhone: z.string().regex(/^1[3-9]\d{9}$/),
+  // ... other fields
+})
+
+// Six on-site statistics calculation
+const getStatistics = () => {
+  const totalTypes = ON_SITE_TYPES.length
+  const completedTypes = new Set(
+    records.filter(r => r.status === 'COMPLETED').map(r => r.onSiteType)
+  ).size
+  const completionRate = totalTypes > 0 ? (completedTypes / totalTypes) * 100 : 0
+  
+  return { totalTypes, completedTypes, completionRate }
+}
+```
+
+### Quality Inspection Management System
+```typescript
+// Quality inspection creation with comprehensive validation
+const createInspectionSchema = z.object({
+  inspectionType: z.enum(['SURVEY', 'DESIGN', 'CONSTRUCTION', 'SUPERVISION', 'BUILDING', 'QUALITY', 'SAFETY', 'PROGRESS']),
+  inspectionDate: z.string().transform((str) => new Date(str)),
+  result: z.enum(['PASS', 'FAIL', 'CONDITIONAL']),
+  score: z.number().int().min(0).max(100).optional(),
+  issues: z.string().optional(),
+  suggestions: z.string().optional(),
+  photos: z.array(z.string()).default([]),
+  followUpDate: z.string().transform((str) => new Date(str)).optional(),
+})
+
+// Inspection statistics and pass rate calculation
+const calculateInspectionStats = (inspections: Inspection[]) => {
+  const total = inspections.length
+  const passed = inspections.filter(i => i.result === 'PASS').length
+  const failed = inspections.filter(i => i.result === 'FAIL').length
+  const passRate = total > 0 ? (passed / total) * 100 : 0
+  
+  return { totalInspections: total, passedInspections: passed, failedInspections: failed, passRate }
+}
+```
+
+### Satisfaction Survey Management System
+```typescript
+// Satisfaction survey with multi-dimensional scoring
+const createSatisfactionSurveySchema = z.object({
+  surveyType: z.enum(['NEW_BUILD_SATISFACTION', 'RENOVATION_SATISFACTION', 'EXPANSION_SATISFACTION', 'REPAIR_SATISFACTION']),
+  overallScore: z.number().int().min(1).max(5),
+  qualityScore: z.number().int().min(1).max(5).optional(),
+  serviceScore: z.number().int().min(1).max(5).optional(),
+  timeScore: z.number().int().min(1).max(5).optional(),
+  feedback: z.string().optional(),
+  respondent: z.string().min(1).max(100),
+  phone: z.string().regex(/^1[3-9]\d{9}$/).optional(),
+  surveyDate: z.string().transform((str) => new Date(str)),
+})
+
+// Satisfaction level configuration with visual indicators
+const SATISFACTION_LEVELS = {
+  5: { label: '非常满意', color: '#52c41a', icon: <SmileOutlined /> },
+  4: { label: '满意', color: '#1890ff', icon: <SmileOutlined /> },
+  3: { label: '一般', color: '#faad14', icon: <MehOutlined /> },
+  2: { label: '不满意', color: '#ff7a45', icon: <FrownOutlined /> },
+  1: { label: '非常不满意', color: '#ff4d4f', icon: <FrownOutlined /> },
+}
+```
+
+### Quality Supervision Main Component Architecture
+```typescript
+// Unified quality supervision management with tabbed interface
+const QualitySupervisionManagement = ({ currentUser }) => {
+  return (
+    <Tabs items={[
+      {
+        key: 'six-on-site',
+        label: '六到场管理',
+        children: <SixOnSiteOverview currentUser={currentUser} />
+      },
+      {
+        key: 'quality-inspection',
+        label: '质量安全检查',
+        children: <QualityInspectionManagement currentUser={currentUser} />
+      },
+      {
+        key: 'satisfaction-survey',
+        label: '满意度调查',
+        children: <SatisfactionSurveyManagement currentUser={currentUser} />
+      }
+    ]} />
+  )
+}
+```
+
+### API Integration Patterns
+```typescript
+// Houses API extended with quality supervision data
+const houseQuerySchema = z.object({
+  // ... existing fields
+  includeSixOnSite: z.string().optional().transform(val => val === 'true'),
+})
+
+// Include condition for quality supervision data
+const includeCondition: any = {
+  applicant: { select: { id: true, realName: true, phone: true } },
+  _count: {
+    select: {
+      housePhotos: true,
+      inspections: true,
+      sixOnSiteRecords: true,
+    }
+  }
+}
+
+if (includeSixOnSite) {
+  includeCondition.sixOnSiteRecords = {
+    orderBy: { scheduledDate: 'desc' }
+  }
+}
+```
+
+### Permission System Extensions
+```typescript
+// Quality supervision permissions added to role-based access control
+export enum Permission {
+  // ... existing permissions
+  SIX_ON_SITE_VIEW = 'six_on_site:view',
+  SIX_ON_SITE_CREATE = 'six_on_site:create',
+  SIX_ON_SITE_EDIT = 'six_on_site:edit',
+  SIX_ON_SITE_DELETE = 'six_on_site:delete',
+  SIX_ON_SITE_MANAGE = 'six_on_site:manage',
+}
+
+// Permission mappings for API routes
+const mappings: Record<string, Permission> = {
+  // ... existing mappings
+  'six_on_site_read': Permission.SIX_ON_SITE_VIEW,
+  'six_on_site_create': Permission.SIX_ON_SITE_CREATE,
+  'six_on_site_update': Permission.SIX_ON_SITE_EDIT,
+  'six_on_site_delete': Permission.SIX_ON_SITE_DELETE,
+  'six_on_site_manage': Permission.SIX_ON_SITE_MANAGE,
+}
+```
+
+### Database Schema Extensions
+```sql
+-- Six on-site records table
+CREATE TABLE six_on_site_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    house_id UUID REFERENCES houses(id) ON DELETE CASCADE,
+    on_site_type VARCHAR(20) NOT NULL,
+    scheduled_date DATE NOT NULL,
+    actual_date DATE,
+    responsible_unit VARCHAR(200) NOT NULL,
+    contact_person VARCHAR(100) NOT NULL,
+    contact_phone VARCHAR(20) NOT NULL,
+    status VARCHAR(20) DEFAULT 'SCHEDULED',
+    arrival_time TIMESTAMP,
+    departure_time TIMESTAMP,
+    work_content TEXT,
+    findings TEXT,
+    suggestions TEXT,
+    photos TEXT[],
+    documents TEXT[],
+    remarks TEXT,
+    recorded_by UUID NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Indexes for performance optimization
+CREATE INDEX idx_six_on_site_house_id ON six_on_site_records(house_id);
+CREATE INDEX idx_six_on_site_type ON six_on_site_records(on_site_type);
+CREATE INDEX idx_six_on_site_scheduled_date ON six_on_site_records(scheduled_date);
+CREATE INDEX idx_six_on_site_status ON six_on_site_records(status);
+```
+
+### Component Integration Best Practices
+```typescript
+// Modal-based management for detailed operations
+const handleOpenManagement = (house: HouseWithSixOnSite) => {
+  setSelectedHouse(house)
+  setIsManagementModalVisible(true)
+}
+
+// Modal with full-width layout for complex management interfaces
+<Modal
+  title={`六到场管理 - ${selectedHouse?.address}`}
+  open={isManagementModalVisible}
+  footer={null}
+  width={1400}
+  style={{ top: 20 }}
+>
+  <SixOnSiteManagement
+    houseId={selectedHouse.id}
+    houseAddress={selectedHouse.address}
+    onClose={() => {
+      setIsManagementModalVisible(false)
+      setSelectedHouse(null)
+      fetchHousesWithSixOnSite() // Refresh data
+    }}
+  />
+</Modal>
+```
+
+## PC Data Collection Tools Implementation
+
+### Village Portal Configuration
+```typescript
+// Village-specific data entry portal
+const VillageDataEntry = ({ villageCode, templates }) => {
+  const [currentStep, setCurrentStep] = useState(0)
+  const [formData, setFormData] = useState({})
+  
+  const steps = [
+    { title: '农房基础信息', component: HouseBasicForm },
+    { title: '建设过程信息', component: HouseConstructionForm },
+    { title: '工匠信息', component: CraftsmanInfoForm },
+    { title: '数据审核', component: DataReview },
+  ].filter(step => templates.includes(step.key) || step.key === 'review')
+
+  const handleNext = async (stepData) => {
+    const newFormData = { ...formData, ...stepData }
+    setFormData(newFormData)
+    await saveDraft(newFormData)
+    
+    if (currentStep < steps.length - 1) {
+      setCurrentStep(currentStep + 1)
+    }
+  }
+
+  return (
+    <Card title={`村庄数据填报 - ${villageCode}`}>
+      <Steps current={currentStep}>
+        {steps.map(step => (
+          <Step key={step.key} title={step.title} />
+        ))}
+      </Steps>
+      <CurrentStepComponent onNext={handleNext} data={formData} />
+    </Card>
+  )
+}
+```
+
+### Batch Import System
+```typescript
+// Excel batch import with validation
+const BatchImport = () => {
+  const handleFileUpload = async (file) => {
+    const data = await readExcelFile(file)
+    const validationResult = validateImportData(data)
+    
+    if (validationResult.errors.length > 0) {
+      setImportResult({
+        total: data.length,
+        success: 0,
+        failed: data.length,
+        errors: validationResult.errors
+      })
+      return
+    }
+
+    const response = await fetch('/api/data-collection/batch-import', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+      },
+      body: JSON.stringify({ data })
+    })
+
+    const result = await response.json()
+    setImportResult(result.data)
+  }
+
+  const validateImportData = (data) => {
+    const errors = []
+    data.forEach((row, index) => {
+      if (!row['农房地址']) {
+        errors.push({
+          row: index + 2,
+          field: '农房地址',
+          message: '农房地址不能为空'
+        })
+      }
+      // Additional validation rules...
+    })
+    return { errors }
+  }
+}
+```
+
+### Template Management System
+```typescript
+// Dynamic form template configuration
+const TemplateManager = () => {
+  const [templates, setTemplates] = useState([])
+  
+  const createTemplate = async (templateData) => {
+    const response = await fetch('/api/data-collection/templates', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+      },
+      body: JSON.stringify(templateData)
+    })
+    
+    if (response.ok) {
+      message.success('模板创建成功')
+      fetchTemplates()
+    }
+  }
+
+  const templateFields = [
+    { name: 'address', label: '农房地址', type: 'text', required: true },
+    { name: 'floors', label: '房屋层数', type: 'number', validation: { min: 1, max: 10 } },
+    { name: 'houseType', label: '房屋类型', type: 'select', options: ['农村住宅', '商业用房'] },
+  ]
+
+  return (
+    <Card title="数据模板管理">
+      <TemplateForm fields={templateFields} onSubmit={createTemplate} />
+    </Card>
+  )
+}
+```
+
+## Mobile Mini-Program Implementation
+
+### WeChat Mini-Program Architecture
+```javascript
+// app.js - Mini-program entry point
+App({
+  globalData: {
+    apiUrl: 'https://your-api-domain.com',
+    userInfo: null,
+  },
+
+  onLaunch() {
+    this.checkLoginStatus()
+    this.initSyncManager()
+    this.watchNetworkStatus()
+  },
+
+  checkLoginStatus() {
+    const token = wx.getStorageSync('token')
+    if (token) {
+      this.validateToken(token)
+    }
+  },
+
+  watchNetworkStatus() {
+    wx.onNetworkStatusChange((res) => {
+      if (res.isConnected) {
+        const syncManager = require('./utils/sync').default
+        syncManager.checkNetworkAndSync()
+      }
+    })
+  }
+})
+```
+
+### Craftsman Mobile Interface
+```javascript
+// pages/craftsman/index.js - Craftsman dashboard
+Page({
+  data: {
+    userInfo: {},
+    projects: [],
+    todayTasks: [],
+  },
+
+  onLoad() {
+    this.loadUserInfo()
+    this.loadProjects()
+  },
+
+  // Report construction progress
+  reportProgress() {
+    wx.navigateTo({
+      url: '/pages/craftsman/report-progress/index'
+    })
+  },
+
+  // Upload construction photos
+  async uploadPhotos() {
+    try {
+      const uploadManager = require('../../utils/upload').default
+      const photos = await uploadManager.uploadImage({ count: 9 })
+      
+      await this.submitProgressReport({
+        photos: photos,
+        timestamp: Date.now()
+      })
+      
+      wx.showToast({ title: '上传成功', icon: 'success' })
+    } catch (error) {
+      wx.showToast({ title: '上传失败', icon: 'none' })
+    }
+  }
+})
+```
+
+### Farmer Application Interface
+```javascript
+// pages/farmer/apply/index.js - House application
+Page({
+  data: {
+    formData: {
+      applicantName: '',
+      address: '',
+      houseType: '',
+      floors: 1,
+    },
+    currentStep: 0,
+  },
+
+  nextStep() {
+    if (this.validateCurrentStep()) {
+      this.setData({
+        currentStep: this.data.currentStep + 1
+      })
+    }
+  },
+
+  async submitApplication() {
+    wx.showLoading({ title: '提交中...' })
+    
+    try {
+      const response = await wx.request({
+        url: `${app.globalData.apiUrl}/api/applications`,
+        method: 'POST',
+        header: {
+          'Authorization': `Bearer ${wx.getStorageSync('token')}`
+        },
+        data: this.data.formData
+      })
+
+      wx.hideLoading()
+      wx.showToast({ title: '申请提交成功', icon: 'success' })
+      
+      setTimeout(() => {
+        wx.navigateBack()
+      }, 1500)
+    } catch (error) {
+      wx.hideLoading()
+      wx.showToast({ title: '提交失败，请重试', icon: 'none' })
+    }
+  }
+})
+```
+
+### Offline Data Sync
+```javascript
+// utils/sync.js - Data synchronization manager
+class SyncManager {
+  constructor() {
+    this.syncQueue = []
+    this.syncing = false
+  }
+
+  addToSyncQueue(action, data) {
+    const syncItem = {
+      id: Date.now() + Math.random(),
+      action: action,
+      data: data,
+      timestamp: Date.now(),
+      retryCount: 0
+    }
+
+    this.syncQueue.push(syncItem)
+    this.checkNetworkAndSync()
+  }
+
+  async startSync() {
+    if (this.syncing || this.syncQueue.length === 0) return
+
+    this.syncing = true
+    const queue = [...this.syncQueue]
+
+    for (let item of queue) {
+      try {
+        await this.syncItem(item)
+        this.removeFromQueue(item.id)
+      } catch (error) {
+        item.retryCount++
+        if (item.retryCount >= 3) {
+          this.removeFromQueue(item.id)
+        }
+      }
+    }
+
+    this.syncing = false
+  }
+
+  async syncItem(item) {
+    switch (item.action) {
+      case 'CREATE_HOUSE':
+        return api.post('/api/houses', item.data)
+      case 'UPDATE_PROGRESS':
+        return api.put(`/api/houses/${item.data.houseId}/progress`, item.data)
+      case 'UPLOAD_PHOTOS':
+        return api.post(`/api/houses/${item.data.houseId}/photos`, item.data)
+    }
+  }
+}
+
+export default new SyncManager()
 ```

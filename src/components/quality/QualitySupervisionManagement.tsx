@@ -9,6 +9,8 @@ import {
   FileSearchOutlined 
 } from '@ant-design/icons'
 import SixOnSiteOverview from './SixOnSiteOverview'
+import QualityInspectionManagement from './QualityInspectionManagement'
+import SatisfactionSurveyManagement from './SatisfactionSurveyManagement'
 
 const { Title } = Typography
 
@@ -56,13 +58,7 @@ const QualitySupervisionManagement: React.FC<QualitySupervisionManagementProps> 
                 </span>
               ),
               children: (
-                <div style={{ padding: '40px', textAlign: 'center' }}>
-                  <CheckCircleOutlined style={{ fontSize: '48px', color: '#1890ff', marginBottom: '16px' }} />
-                  <Title level={3}>质量安全检查系统</Title>
-                  <p style={{ color: '#666' }}>
-                    此功能正在开发中，将支持区市、镇街日常质量安全检查信息录入和管理
-                  </p>
-                </div>
+                <QualityInspectionManagement currentUser={currentUser} />
               )
             },
             {
@@ -74,13 +70,7 @@ const QualitySupervisionManagement: React.FC<QualitySupervisionManagementProps> 
                 </span>
               ),
               children: (
-                <div style={{ padding: '40px', textAlign: 'center' }}>
-                  <FileSearchOutlined style={{ fontSize: '48px', color: '#52c41a', marginBottom: '16px' }} />
-                  <Title level={3}>满意度调查系统</Title>
-                  <p style={{ color: '#666' }}>
-                    此功能正在开发中，将支持群众满意度反馈收集和村民问卷调查
-                  </p>
-                </div>
+                <SatisfactionSurveyManagement currentUser={currentUser} />
               )
             }
           ]}

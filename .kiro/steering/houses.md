@@ -273,3 +273,48 @@ pnpm dev
 - 农房申请完整流程
 - 地图查看和筛选功能
 - 移动端响应式测试
+#
+# 质量安全监管功能集成
+
+### 六到场管理集成
+- 在农房详情页面新增"六到场管理"标签页
+- 支持从农房详情直接进入六到场管理界面
+- 与农房建设状态联动，实时跟踪到场情况
+
+### 质量安全检查集成
+- 检查记录与农房信息关联
+- 支持从农房详情查看历史检查记录
+- 检查结果影响农房建设状态更新
+
+### 满意度调查集成
+- 满意度调查与农房项目关联
+- 支持按农房类型进行满意度统计
+- 调查结果用于质量改进和工匠评价
+
+### API扩展
+- 农房API新增 `includeSixOnSite` 参数支持
+- 支持查询农房关联的质量监管数据
+- 统一的权限控制和区域访问限制
+
+### 组件集成模式
+```typescript
+// 农房详情页面集成六到场管理
+<Tabs items={[
+  {
+    key: 'six-on-site',
+    label: '六到场管理',
+    children: (
+      <SixOnSiteManagement
+        houseId={houseId}
+        houseAddress={house.address}
+      />
+    )
+  }
+]} />
+```
+
+### 数据关联关系
+- House -> SixOnSiteRecord (一对多)
+- House -> Inspection (一对多)  
+- House -> SatisfactionSurvey (一对多)
+- 所有质量监管数据都通过 houseId 与农房关联

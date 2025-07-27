@@ -4,32 +4,34 @@ import { prisma } from '@/lib/prisma'
 import { verifyTokenFromRequest } from '@/lib/auth'
 import { checkPermission } from '@/lib/permissions'
 
-// 检查记录创建验证schema
-const createInspectionSchema = z.object({
-  inspectionType: z.enum(['SURVEY', 'DESIGN', 'CONSTRUCTION', 'SUPERVISION', 'BUILDING', 'QUALITY', 'SAFETY', 'PROGRESS']),
-  inspectionDate: z.string().transform((str) => new Date(str)),
-  result: z.enum(['PASS', 'FAIL', 'CONDITIONAL']),
-  score: z.number().int().min(0).max(100).optional(),
-  issues: z.string().optional(),
-  suggestions: z.string().optional(),
-  photos: z.array(z.string()).default([]),
-  followUpDate: z.string().transform((str) => new Date(str)).optional(),
-  status: z.enum(['PENDING', 'COMPLETED', 'RESCHEDULED']).default('PENDING'),
+// 满意度调查创建验证schema
+const createSatisfactionSurveySchema = z.object({
+  surveyType: z.enum(['NEW_BUILD_SATISFACTION', 'RENOVATION_SATISFACTION', 'EXPANSION_SATISFACTION', 'REPAIR_SATISFACTION']),
+  overallScore: z.number().int().min(1).max(5),
+  qualityScore: z.number().int().min(1).max(5).optional(),
+  serviceScore: z.number().int().min(1).max(5).optional(),
+  timeScore: z.number().int().min(1).max(5).optional(),
+  feedback: z.string().optional(),
+  respondent: z.string().min(1, '受访者姓名不能为空').max(100, '受访者姓名过长'),
+  phone: z.string().regex(/^1[3-9]\d{9}$/, '手机号格式不正确').optional(),
+  surveyDate: z.string().transform((str) => new Date(str)),
+  status: z.enum(['PENDING', 'COMPLETED', 'CANCELLED']).default('COMPLETED'),
 })
 
-// 检查记录更新验证schema
-const updateInspectionSchema = z.object({
-  inspectionDate: z.string().transform((str) => new Date(str)).optional(),
-  result: z.enum(['PASS', 'FAIL', 'CONDITIONAL']).optional(),
-  score: z.number().int().min(0).max(100).optional(),
-  issues: z.string().optional(),
-  suggestions: z.string().optional(),
-  photos: z.array(z.string()).optional(),
-  followUpDate: z.string().transform((str) => new Date(str)).optional(),
-  status: z.enum(['PENDING', 'COMPLETED', 'RESCHEDULED']).optional(),
+// 满意度调查更新验证schema
+const updateSatisfactionSurveySchema = z.object({
+  overallScore: z.number().int().min(1).max(5).optional(),
+  qualityScore: z.number().int().min(1).max(5).optional(),
+  serviceScore: z.number().int().min(1).max(5).optional(),
+  timeScore: z.number().int().min(1).max(5).optional(),
+  feedback: z.string().optional(),
+  respondent: z.string().min(1).max(100).optional(),
+  phone: z.string().regex(/^1[3-9]\d{9}$/).optional(),
+  surveyDate: z.string().transform((str) => new Date(str)).optional(),
+  status: z.enum(['PENDING', 'COMPLETED', 'CANCELLED']).optional(),
 })
 
-// 获取农房的检查记录列表
+// 获取农房的满意度调查列表
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -42,7 +44,7 @@ export async function GET(
     }
 
     // 检查权限
-    if (!checkPermission(user.role, 'inspection', 'view')) {
+    if (!checkPermission(user.role, 'house', 'read')) {
       return NextResponse.json({ error: 'FORBIDDEN', message: '权限不足' }, { status: 403 })
     }
 
@@ -67,8 +69,7 @@ export async function GET(
 
     // 获取查询参数
     const { searchParams } = new URL(req.url)
-    const inspectionType = searchParams.get('inspectionType')
-    const result = searchParams.get('result')
+    const surveyType = searchParams.get('surveyType')
     const status = searchParams.get('status')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
@@ -76,12 +77,8 @@ export async function GET(
     // 构建查询条件
     const where: any = { houseId }
 
-    if (inspectionType) {
-      where.inspectionType = inspectionType
-    }
-
-    if (result) {
-      where.result = result
+    if (surveyType) {
+      where.surveyType = surveyType
     }
 
     if (status) {
@@ -89,61 +86,64 @@ export async function GET(
     }
 
     if (startDate || endDate) {
-      where.inspectionDate = {}
+      where.surveyDate = {}
       if (startDate) {
-        where.inspectionDate.gte = new Date(startDate)
+        where.surveyDate.gte = new Date(startDate)
       }
       if (endDate) {
-        where.inspectionDate.lte = new Date(endDate)
+        where.surveyDate.lte = new Date(endDate)
       }
     }
 
-    // 查询检查记录
-    const inspections = await prisma.inspection.findMany({
+    // 查询满意度调查记录
+    const satisfactionSurveys = await prisma.satisfactionSurvey.findMany({
       where,
-      include: {
-        inspector: {
-          select: {
-            id: true,
-            realName: true,
-            phone: true,
-          },
-        },
-      },
       orderBy: [
-        { inspectionDate: 'desc' },
+        { surveyDate: 'desc' },
         { createdAt: 'desc' },
       ],
     })
 
-    // 统计检查情况
-    const statistics = await prisma.inspection.groupBy({
-      by: ['inspectionType', 'result'],
+    // 统计满意度情况
+    const statistics = await prisma.satisfactionSurvey.groupBy({
+      by: ['surveyType', 'overallScore'],
       where: { houseId },
       _count: { id: true },
     })
 
+    // 计算平均满意度
+    const averageScores = await prisma.satisfactionSurvey.aggregate({
+      where: { houseId, status: 'COMPLETED' },
+      _avg: {
+        overallScore: true,
+        qualityScore: true,
+        serviceScore: true,
+        timeScore: true,
+      },
+    })
+
     return NextResponse.json({
-      message: '获取检查记录成功',
+      message: '获取满意度调查记录成功',
       data: {
         house: {
           id: house.id,
           address: house.address,
         },
-        inspections,
+        surveys: satisfactionSurveys,
         statistics,
+        averageScores,
       },
     })
   } catch (error) {
-    console.error('Get inspections error:', error)
+    console.error('Get satisfaction surveys error:', error)
     return NextResponse.json(
-      { error: 'INTERNAL_ERROR', message: '获取检查记录失败' },
+      { error: 'INTERNAL_ERROR', message: '获取满意度调查记录失败' },
       { status: 500 }
     )
   }
 }
 
-// 创建检查记录
+// 创建满意度调查记录
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -156,7 +156,7 @@ export async function POST(
     }
 
     // 检查权限
-    if (!checkPermission(user.role, 'inspection', 'create')) {
+    if (!checkPermission(user.role, 'house', 'update')) {
       return NextResponse.json({ error: 'FORBIDDEN', message: '权限不足' }, { status: 403 })
     }
 
@@ -181,7 +181,7 @@ export async function POST(
 
     // 验证请求数据
     const body = await req.json()
-    const validation = createInspectionSchema.safeParse(body)
+    const validation = createSatisfactionSurveySchema.safeParse(body)
 
     if (!validation.success) {
       return NextResponse.json(
@@ -196,32 +196,22 @@ export async function POST(
 
     const data = validation.data
 
-    // 创建检查记录
-    const inspection = await prisma.inspection.create({
+    // 创建满意度调查记录
+    const satisfactionSurvey = await prisma.satisfactionSurvey.create({
       data: {
         ...data,
         houseId,
-        inspectorId: user.id,
-      },
-      include: {
-        inspector: {
-          select: {
-            id: true,
-            realName: true,
-            phone: true,
-          },
-        },
       },
     })
 
     return NextResponse.json({
-      message: '创建检查记录成功',
-      data: inspection,
+      message: '创建满意度调查记录成功',
+      data: satisfactionSurvey,
     }, { status: 201 })
   } catch (error) {
-    console.error('Create inspection error:', error)
+    console.error('Create satisfaction survey error:', error)
     return NextResponse.json(
-      { error: 'INTERNAL_ERROR', message: '创建检查记录失败' },
+      { error: 'INTERNAL_ERROR', message: '创建满意度调查记录失败' },
       { status: 500 }
     )
   }
